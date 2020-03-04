@@ -1,0 +1,186 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="dircopy">
+      <UniqueIdentifier>{896f2931-d3c9-4bee-a21f-11c892b172e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lzma">
+      <UniqueIdentifier>{7ae300fd-f4a4-41e2-957e-c96946859468}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dircopy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zAlloc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zArcIn.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zBuf.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zBuf2.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zCrc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zCrcOpt.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zDec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zFile.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\7zStream.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Aes.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\AesOpt.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Alloc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Bcj2.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Bcj2Enc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Bra.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Bra86.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\BraIA64.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\CpuArch.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Delta.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\DllSecur.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\LzFind.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\LzFindMt.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Lzma2Dec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Lzma2DecMt.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Lzma2Enc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Lzma86Dec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Lzma86Enc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\LzmaDec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\LzmaEnc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\LzmaLib.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\MtCoder.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\MtDec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Ppmd7.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Ppmd7Dec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Ppmd7Enc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Sha256.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Sort.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Threads.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\Xz.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\XzCrc64.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\XzCrc64Opt.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\XzDec.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\XzEnc.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\LZMA19.00\LZMA\XzIn.c">
+      <Filter>lzma</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="dircopy\backup.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\defs.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\mount.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\restore.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\test.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\validate.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="dircopy\delta.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+  </ItemGroup>
+</Project>
