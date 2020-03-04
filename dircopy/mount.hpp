@@ -3,6 +3,9 @@
 #pragma once
 
 #include "d8u/util.hpp"
+#include "d8u/transform.hpp"
+
+#include "../gsl-lite.hpp"
 
 #include "restore.hpp"
 #include "delta.hpp"
@@ -12,6 +15,7 @@ namespace dircopy
 	namespace mount
 	{
 		using namespace d8u::util;
+		using namespace d8u::transform;
 
 		template < typename S, typename D > class Path
 		{
@@ -21,16 +25,11 @@ namespace dircopy
 
 			tdb::MemoryHashmap db;
 
-			size_t BLOCK;
-			size_t THRESHOLD;
-
 			bool validate;
 
 		public:
-			Path(const DefaultHash& folder_key, S & _s, D& _d, size_t B = 1024 * 1024, size_t T = 128 * 1024 * 1024, bool v = true)
-				: BLOCK(B)
-				, THREASHOLD(T)
-				, store(_s)
+			Path(const DefaultHash & folder_key, S & _s, D& _d, bool v = true)
+				: store(_s)
 				, domain(_d)
 				, validate(v)
 			{
@@ -38,7 +37,7 @@ namespace dircopy
 
 				auto database = restore::file_memory(stats, gsl::span<DefaultHash>((DefaultHash*)folder_record.data(), folder_record.size() / sizeof(DefaultHash)), store, domain, validate, validate);
 
-				db = tdb::MemoryHashmap(database);
+				db.Open(database);
 			}
 
 			auto Usage()
@@ -48,9 +47,9 @@ namespace dircopy
 
 			//true continues enumeration, false ends it. keys are used to fetch file blocks
 			//bool(uint64_t size, uint64_t last_write, string_view name, span keys)
-			template < typename F > Enumerate(F&& f)
+			template < typename F > size_t Enumerate(F&& f)
 			{
-				db.Iterate([&, f = std::move(f)](uint64_t p)
+				return (size_t) db.Iterate([&, f = std::move(f)](uint64_t p)
 				{
 					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
 
@@ -58,8 +57,10 @@ namespace dircopy
 				});
 			}
 
-			template < typename F > Search(std::string_view target, F&& f)
+			template < typename F > size_t Search(std::string_view target, F&& f)
 			{
+				size_t total = 0;
+
 				db.Iterate([&, f = std::move(f)](uint64_t p)
 				{
 					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
@@ -67,10 +68,15 @@ namespace dircopy
 					auto it = std::search(name.begin(), name.end(), target.begin(), target.end(), [](char ch1, char ch2) { return std::tolower(ch1) == std::tolower(ch2); });
 
 					if (it != name.end())
+					{
+						total++;
 						return f(size, time, name, keys);
+					}
 
 					return true;
 				});
+
+				return total;
 			}
 
 			std::vector<uint8_t> Memory(std::string_view name, size_t P = 4)
@@ -85,12 +91,11 @@ namespace dircopy
 
 				if (keys.size() == 1)
 				{
-					temp = restore::block(s, *keys.data(), store, domain, P))
-					keys = gsl::span<DefaultHash>((*DefaultHash)temp.date(), temp.size() / sizeof(DefaultHash));
+					temp = restore::block(stats, *keys.data(), store, domain, P);
+					keys = gsl::span<DefaultHash>((DefaultHash*)temp.data(), temp.size() / sizeof(DefaultHash));
 				}
 	
 				return restore::file_memory(stats, keys, store, domain, validate, validate);
-
 			}
 
 			void Download(std::string_view name, std::string_view dest, size_t P = 4)
@@ -105,8 +110,8 @@ namespace dircopy
 
 				if (keys.size() == 1)
 				{
-					temp = restore::block(s, *keys.data(), store, domain, P))
-					keys = gsl::span<DefaultHash>((*DefaultHash)temp.date(), temp.size() / sizeof(DefaultHash));
+					temp = restore::block(stats, *keys.data(), store, domain, P);
+					keys = gsl::span<DefaultHash>((DefaultHash*)temp.data(), temp.size() / sizeof(DefaultHash));
 				}
 
 				restore::_file2(stats, dest,keys, store, domain, validate, validate, P);

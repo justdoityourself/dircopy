@@ -8,6 +8,7 @@
 #include "backup.hpp"
 #include "restore.hpp"
 #include "validate.hpp"
+#include "mount.hpp"
 
 #include "volstore/simple.hpp"
 #include "d8u/util.hpp"
@@ -16,6 +17,42 @@
 
 using namespace dircopy;
 using namespace d8u;
+
+
+TEST_CASE("Mount", "[volcopy::backup/restore]")
+{
+	std::filesystem::remove_all("mount");
+	std::filesystem::remove_all("delta");
+	std::filesystem::remove_all("teststore");
+	std::filesystem::create_directories("teststore");
+	std::filesystem::create_directories("mount");
+
+	volstore::Simple store("teststore");
+
+	auto result = backup::recursive_folder("delta", "testdata", store, [](auto&, auto, auto) {}, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
+
+	mount::Path handle(result.key, store, util::default_domain, true);
+
+	CHECK(1 == handle.Search("ge_com", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(1 == handle.Search("medium", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(2 == handle.Search("tiny", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(5 == handle.Search("compress", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(2 == handle.Search("nocompress", [](auto s, auto t, auto n, auto k) {return true; }));
+
+	size_t count = 0;
+
+	handle.Enumerate([&](auto s, auto t, auto n, auto k)
+	{
+		count++;
+		return true;
+	});
+
+	CHECK(5 == count);
+
+	std::filesystem::remove_all("mount");
+	std::filesystem::remove_all("delta");
+	std::filesystem::remove_all("teststore");
+}
 
 
 TEST_CASE("Simple File", "[volcopy::backup/restore]")
@@ -153,5 +190,4 @@ TEST_CASE("Folder", "[volcopy::backup/restore]")
 	std::filesystem::remove_all("delta");
 	std::filesystem::remove_all("altdelta");
 }
-
 
