@@ -49,7 +49,7 @@ TEST_CASE("Comprehensive folder structure", "[dircopy::backup/restore]")
 			handle.Mount(volrng::MOUNT);
 
 			auto result = backup::vss_folder("testsnap", volrng::MOUNT, store,
-				[](auto&, auto, auto) {},
+				[](auto&, auto, auto) { return true; },
 				util::default_domain, 8, util::_mb(1), 8, 5, 1, util::_mb(64));
 
 			handle.Dismount();
@@ -82,7 +82,7 @@ TEST_CASE("Mount", "[dircopy::backup/restore]")
 
 	volstore::Simple store("teststore");
 
-	auto result = backup::recursive_folder("delta", "testdata", store, [](auto&, auto, auto) {}, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
+	auto result = backup::recursive_folder("delta", "testdata", store, [](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
 
 	mount::Path handle(result.key, store, util::default_domain, true);
 
@@ -214,11 +214,11 @@ TEST_CASE("Folder", "[dircopy::backup/restore]")
 	volstore::Simple store("teststore");
 
 	auto result1 = backup::recursive_folder("delta","testdata", store,
-		[](auto&, auto, auto) {}, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
+		[](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
 	auto result2 = backup::recursive_folder("delta", "testdata", store,
-		[](auto&, auto, auto) {}, util::default_domain, 3, 1024 * 1024, 6, 5, 1, 64 * 1024 * 1024);
+		[](auto&, auto, auto) { return true; }, util::default_domain, 3, 1024 * 1024, 6, 5, 1, 64 * 1024 * 1024);
 	auto result3 = backup::vss_folder("altdelta", "testdata", store,
-		[](auto&, auto, auto) {}, util::default_domain, 16, 1024 * 1024, 16, 5, 16, 64 * 1024 * 1024);
+		[](auto&, auto, auto) { return true; }, util::default_domain, 16, 1024 * 1024, 16, 5, 16, 64 * 1024 * 1024);
 
 
 	CHECK(std::equal(result1.key.begin(), result1.key.end(), result2.key.begin()));

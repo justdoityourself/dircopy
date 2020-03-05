@@ -308,6 +308,47 @@ namespace dircopy
 			return submit_core(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
 		}
 
+		template < typename DITR, typename ON_FILE > void core_delta(delta::Path& db, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel_count = 0)
+		{
+			for (auto& e : DITR(path, std::filesystem::directory_options::skip_permission_denied))
+			{
+				if (e.is_directory())
+					continue;
+
+				uint64_t change_time = GetFileWriteTime(e);
+				auto rel = e.path().string();
+				auto full = rel;
+
+				if (rel_count)
+				{
+					//When using a snapshot or mountpoint, correct the path:
+					//
+
+					for (int c = 0, i = 0; i < rel.size(); i++)
+					{
+						if (rel[i] == '/' || rel[i] == '\\')
+						{
+							c++;
+
+							if (rel_count == c)
+							{
+								rel = std::string(drive) + rel.substr(i + 1);
+								break;
+							}
+						}
+					}
+				}
+
+				uint64_t size = e.file_size();
+
+				if (!db.Changed(rel, size, change_time, nullptr))
+					continue;
+
+				if (!on_file(rel, size, change_time))
+					break;
+			}
+		}
+
 
 		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
 		{
@@ -365,7 +406,8 @@ namespace dircopy
 					stats.atomic.files--;
 				};
 
-				on_file(rel, size, change_time);
+				if (!on_file(rel, size, change_time))
+					break;
 
 				if (FILES == 1)
 					_file(full, rel, size, change_time, queue);
@@ -391,6 +433,23 @@ namespace dircopy
 			core_folder<DITR>(db,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
 
 			return submit_file2(stats, db.Finalize(), store, domain, BLOCK, THREADS, compression, GROUP);
+		}
+
+		template < typename DITR, typename ON_FILE > void delta_folder(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		{
+			delta::Path db(snapshot);
+
+			core_delta<DITR>(db, path, on_file, drive, rel);
+		}
+
+		template < typename ON_FILE > void single_delta(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		{
+			delta_folder< std::filesystem::directory_iterator >(snapshot, path, on_file, drive, rel);
+		}
+
+		template < typename ON_FILE> void recursive_delta(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		{
+			delta_folder< std::filesystem::recursive_directory_iterator >(snapshot, path, on_file, drive, rel);
 		}
 
 		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)

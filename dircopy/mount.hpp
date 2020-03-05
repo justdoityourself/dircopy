@@ -45,6 +45,11 @@ namespace dircopy
 				return stats.direct;
 			}
 
+			void PrintUsage()
+			{
+				stats.Print();
+			}
+
 			//true continues enumeration, false ends it. keys are used to fetch file blocks
 			//bool(uint64_t size, uint64_t last_write, string_view name, span keys)
 			template < typename F > size_t Enumerate(F&& f)
@@ -98,13 +103,13 @@ namespace dircopy
 				return restore::file_memory(stats, keys, store, domain, validate, validate);
 			}
 
-			void Download(std::string_view name, std::string_view dest, size_t P = 4)
+			void Fetch(std::string_view _name, std::string_view dest, size_t P = 4)
 			{
 				std::vector<uint8_t> temp;
-				auto p = db.Find(name);
+				auto p = db.Find(_name);
 
 				if (!p)
-					return false;
+					return;
 
 				auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(*p));
 

@@ -64,6 +64,9 @@ namespace dircopy
 
 				if (would_write && *pointer == when)
 				{
+					if (!queue)
+						return false;
+
 					auto data = previous.Find(s);
 						
 					if (!data)

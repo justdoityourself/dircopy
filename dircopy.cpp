@@ -38,7 +38,10 @@ int main(int argc, char* argv[])
 #include "d8u/string_switch.hpp"
 #include "d8u/util.hpp"
 #include "d8u/transform.hpp"
+
 #include "dircopy/backup.hpp"
+#include "dircopy/validate.hpp"
+#include "dircopy/mount.hpp"
 
 using std::string;
 using namespace clipp;
@@ -51,19 +54,21 @@ int main(int argc, char* argv[])
     string path = "", snapshot = "snap", image = "", action = "backup", key = "";
     size_t threads = 8;
     size_t files = 4;
+    bool validate = false;
     size_t compression = 5; //TODO enable
     size_t block_grouping = 16; //TODO enable
     auto domain = d8u::util::default_domain; //TODO enable
 
     auto cli = (
         option("-k", "--key").doc("The store key used to restore, mount or validate") & value("key", key),
-        option("-a", "--action").doc("What action will be taken, backup, validate, delta, search, restore, fetch, enumerate") & value("action", action),
+        option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate") & value("action", action),
         option("-s", "--snapshot").doc("A path where snapshot databases are stored") & value("snapshot", path),
         option("-i", "--image").doc("Path, hostname or IP of the image or store: D:\\Backup, backup.com, 192.168.4.14") & value("image", image),
         option("-p", "--path").doc("Path to backup") & value("directory", path),
         option("-t", "--threads").doc("Threads used to encode / decode") & value("threads", threads),
         option("-f", "--files").doc("Files processed at a time") & value("threads", threads),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
+        option("-x", "--validate").doc("Use vss snapshot").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directoroes").set(recursive)
         );
 
@@ -71,9 +76,15 @@ int main(int argc, char* argv[])
     d8u::util::Statistics stats;
     std::string current_file;
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     std::thread console([&]()
     {
-
+        while (running)
+        {
+            stats.Print();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
     });
 
     try
@@ -87,6 +98,8 @@ int main(int argc, char* argv[])
             auto on_file = [&](auto size, auto time, auto name)
             {
                 current_file = name;
+
+                return true;
             };
 
             auto do_switch = [&](auto& store)
@@ -113,6 +126,92 @@ int main(int argc, char* argv[])
                             result = backup::single_folder2(snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                     }
 
+                    std::cout << "Key: " << d8u::util::to_hex(result) << std::endl;
+
+                    break;
+                case switch_t("validate"):
+                    if (validate::folder2(stats,d8u::util::to_bin(key), store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                        std::cout << "Validation Success" << std::endl;
+                    else
+                        std::cout << "Error Detected" << std::endl;
+                    break;
+                case switch_t("validate_deep"):
+                    if (validate::deep_folder2(stats,d8u::util::to_bin(key), store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                        std::cout << "Validation Success" << std::endl;
+                    else
+                        std::cout << "Error Detected" << std::endl;
+                    break;
+                case switch_t("delta"):
+
+                    running = false;
+                    console.join();
+
+                    if (recursive)
+                        backup::recursive_delta(snapshot, path, [](auto name, auto size, auto time)
+                        {
+                            std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
+
+                            return true;
+                        });
+                    else
+                        backup::single_delta(snapshot, path, [](auto name, auto size, auto time)
+                        {
+                            std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
+
+                            return true;
+                        });
+
+                    break;
+                case switch_t("search"):
+                {
+                    mount::Path handle(d8u::util::to_bin(key),store,domain,validate);
+
+                    running = false;
+                    console.join();
+
+                    handle.Search(key, [&](auto size, auto time, auto name, auto keys)
+                    {
+                        std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
+
+                        return true;
+                    });
+
+                    handle.PrintUsage();
+                }
+                    break;
+                case switch_t("restore"):
+
+                    restore::folder2(stats, path, d8u::util::to_bin(key), store, domain, validate, validate, 1024 * 1024, 128* 1024 * 1024, threads, files);
+
+                    break;
+                case switch_t("fetch"):
+                {
+                    mount::Path handle(d8u::util::to_bin(key), store, domain, validate);
+
+                    running = false;
+                    console.join();
+
+                    handle.Fetch(key,path ,threads);
+
+                    handle.PrintUsage();
+                }
+                    break;
+                case switch_t("enumerate"):
+                {
+                    mount::Path handle(d8u::util::to_bin(key), store, domain, validate);
+
+                    running = false;
+                    console.join();
+
+                    handle.Enumerate([&](auto size, auto time, auto name, auto keys)
+                    {
+                        std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
+
+                        return true;
+                    });
+
+                    handle.PrintUsage();
+                }
                     break;
                 }
             };
@@ -130,8 +229,12 @@ int main(int argc, char* argv[])
 
             running = false;
             console.join();
-            std::cout << "result todo" << std::endl;
-            std::cout << "Finished in " << "TODO" << std::endl;
+
+            auto finish = std::chrono::high_resolution_clock::now();
+
+            std::chrono::duration<double> elapsed = finish - start;
+
+            std::cout << "Finished in: " << elapsed.count() << " s\n";
         }
     }
     catch (const std::exception & ex)

@@ -22,7 +22,7 @@ namespace dircopy
 		//We only ever send the ID to the store.
 		//
 
-		template <typename S, typename D> bool block(Statistics& stats, const DefaultHash& key, const S& store, const D& domain /*unused, API compatibility only*/)
+		template <typename S, typename D> bool block(Statistics& stats, const DefaultHash& key, S& store, const D& domain /*unused, API compatibility only*/)
 		{
 			auto id = key.Next();
 
@@ -35,7 +35,7 @@ namespace dircopy
 		//Therefore we read the block instead of sending the key over the wire.
 		//
 
-		template <typename S, typename D> bool deep_block(Statistics & stats,const DefaultHash& key, const S& store, const D& domain)
+		template <typename S, typename D> bool deep_block(Statistics & stats,const DefaultHash& key, S& store, const D& domain)
 		{
 			try
 			{
@@ -60,7 +60,7 @@ namespace dircopy
 		}
 
 		//TODO add parallel, see restore::file for template
-		template <typename S, typename D, typename V> bool core_file(Statistics& stats, const DefaultHash& file_key, const S& store, const D& domain, V v, size_t P = 1)
+		template <typename S, typename D, typename V> bool core_file(Statistics& stats, const DefaultHash& file_key, S& store, const D& domain, V v, size_t P = 1)
 		{
 			try
 			{
@@ -127,14 +127,14 @@ namespace dircopy
 			return false;
 		}
 
-		template <typename S, typename D> std::pair<bool, Direct> file(const DefaultHash& file_key, const S& store, const D& domain, size_t P = 1)
+		template <typename S, typename D> std::pair<bool, Direct> file(const DefaultHash& file_key, S& store, const D& domain, size_t P = 1)
 		{
 			Statistics s;
 
 			return std::make_pair(core_file(s,file_key, store, domain, block<S, D>,P),s.direct);
 		}
 
-		template <typename S, typename D> std::pair<bool, Direct> deep_file(const DefaultHash& file_key, const S& store, const D& domain, size_t P = 1)
+		template <typename S, typename D> std::pair<bool, Direct> deep_file(const DefaultHash& file_key, S& store, const D& domain, size_t P = 1)
 		{
 			Statistics s;
 
@@ -142,7 +142,7 @@ namespace dircopy
 		}
 
 		//todo parallel, see restore::folder
-		template <typename S, typename D, typename V> bool core_folder(Statistics &s ,const DefaultHash& folder_key, const S& store, const D& domain, V v, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename S, typename D, typename V> bool core_folder(Statistics &s ,const DefaultHash& folder_key, S& store, const D& domain, V v, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			try
 			{
@@ -223,14 +223,24 @@ namespace dircopy
 			return false;
 		}
 
-		template <typename S, typename D> std::pair<bool, Direct> folder(const DefaultHash& folder_key, const S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename S, typename D> bool folder2(Statistics &s,const DefaultHash& folder_key, S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		{
+			return core_folder(s, folder_key, store, domain, block<S, D>, BLOCK, THRESHOLD, P, F);
+		}
+
+		template <typename S, typename D> bool deep_folder2(Statistics& s, const DefaultHash& folder_key, S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		{
+			return core_folder(s, folder_key, store, domain, deep_block<S, D>, BLOCK, THRESHOLD, P, F);
+		}
+
+		template <typename S, typename D> std::pair<bool, Direct> folder(const DefaultHash& folder_key, S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			Statistics s;
 
 			return std::make_pair(core_folder(s,folder_key, store, domain, block<S, D>, BLOCK, THRESHOLD,P,F),s.direct);
 		}
 
-		template <typename S, typename D> std::pair<bool, Direct> deep_folder(const DefaultHash& folder_key, const S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename S, typename D> std::pair<bool, Direct> deep_folder(const DefaultHash& folder_key, S& store, const D& domain, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			Statistics s;
 
