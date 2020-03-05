@@ -102,6 +102,8 @@ namespace dircopy
 					if (hash_file)
 						state.Update(buffer);
 
+					s.atomic.write += buffer.size();
+
 					output.write((char*)buffer.data(), buffer.size());
 				}
 			}
@@ -119,6 +121,8 @@ namespace dircopy
 
 						if (hash_file)
 							state.Update(e);
+
+						s.atomic.write += e.size();
 
 						output.write((char*)e.data(), e.size());
 					}

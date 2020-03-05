@@ -5,3 +5,4 @@ test/*
 delta/*
 altdelta/*
 teststore/*
+cli/*

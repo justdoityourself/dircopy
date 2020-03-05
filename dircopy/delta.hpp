@@ -60,13 +60,16 @@ namespace dircopy
 
 			bool Changed(std::string_view s, uint64_t size, uint64_t when, uint8_t * queue )
 			{
+				if (!queue)
+				{
+					auto p = change.Find(s);
+					return p ? !(*p == when) : true;
+				}
+
 				auto [pointer,would_write] = change.Insert(s, when);
 
 				if (would_write && *pointer == when)
 				{
-					if (!queue)
-						return false;
-
 					auto data = previous.Find(s);
 						
 					if (!data)
