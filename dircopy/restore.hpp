@@ -21,7 +21,7 @@ namespace dircopy
 
 
 
-		template <typename S, typename D> std::vector<uint8_t> block(Statistics & s,const DefaultHash& key, const S& store, const D& domain, bool validate = false)
+		template <typename S, typename D> std::vector<uint8_t> block(Statistics & s,const DefaultHash& key, S& store, const D& domain, bool validate = false)
 		{
 			auto file_id = key.Next();
 			auto block = store.Read(file_id);
@@ -42,7 +42,7 @@ namespace dircopy
 			return block;
 		}
 
-		template <typename S, typename D> std::vector<uint8_t> file_memory(Statistics& s, span<DefaultHash> keys, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false)
+		template <typename S, typename D> std::vector<uint8_t> file_memory(Statistics& s, span<DefaultHash> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false)
 		{
 			std::vector<uint8_t> result;
 			result.reserve(keys.size() * 1024 * 1024);
@@ -76,7 +76,7 @@ namespace dircopy
 			return result;
 		}
 
-		template <typename S, typename D> void _file2(Statistics& s, std::string_view dest, span<DefaultHash> keys, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename S, typename D> void _file2(Statistics& s, std::string_view dest, span<DefaultHash> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
 			HashState state;
 
@@ -150,7 +150,7 @@ namespace dircopy
 			}
 		}
 
-		template <typename S, typename D> void file2(Statistics& s, std::string_view dest, const DefaultHash& file_key, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename S, typename D> void file2(Statistics& s, std::string_view dest, const DefaultHash& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
 			auto file_record = block(s,file_key, store, domain, validate_blocks);
 
@@ -162,7 +162,7 @@ namespace dircopy
 			_file2(s,dest, keys, store, domain, validate_blocks, hash_file, P);
 		}
 
-		template <typename S, typename D> void folder2(Statistics & s,std::string_view dest, const DefaultHash& folder_key, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename S, typename D> void folder2(Statistics & s,std::string_view dest, const DefaultHash& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			std::atomic<size_t> files = 0;
 
@@ -218,7 +218,7 @@ namespace dircopy
 			}
 		}
 
-		template <typename S, typename D> Direct file( std::string_view dest, const DefaultHash& file_key, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename S, typename D> Direct file( std::string_view dest, const DefaultHash& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
 			Statistics s;
 		
@@ -227,7 +227,7 @@ namespace dircopy
 			return s.direct;
 		}
 
-		template <typename S, typename D> Direct folder(std::string_view dest, const DefaultHash& folder_key, const S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename S, typename D> Direct folder(std::string_view dest, const DefaultHash& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			Statistics s;
 

@@ -73,7 +73,7 @@ namespace dircopy
 		}
 		*/
 
-		template < typename STORE, typename D > DefaultHash block(Statistics& stats, std::vector<uint8_t>& buffer, const STORE& store, const D& domain = default_domain, int compression = 5)
+		template < typename STORE, typename D > DefaultHash block(Statistics& stats, std::vector<uint8_t>& buffer, STORE& store, const D& domain = default_domain, int compression = 5)
 		{
 			stats.atomic.read += buffer.size(); stats.atomic.blocks++;
 
@@ -95,7 +95,7 @@ namespace dircopy
 			return key;
 		}
 
-		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, const STORE& store, const D& domain = default_domain, int compression = 5)
+		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, STORE& store, const D& domain = default_domain, int compression = 5)
 		{
 			if (MAX == 0)
 			{
@@ -115,7 +115,7 @@ namespace dircopy
 			}, std::move(buffer)).detach();
 		}
 
-		template < typename MAP, typename STORE, typename D > std::vector<uint8_t> core_file(Statistics& stats, const MAP& file, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename MAP, typename STORE, typename D > std::vector<uint8_t> core_file(Statistics& stats, const MAP& file, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			std::atomic<int> local_threads = 0;
 
@@ -239,7 +239,7 @@ namespace dircopy
 		}
 
 
-		template < typename MAP, typename STORE, typename D> DefaultHash submit_core(Statistics& stats, const MAP& file, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename MAP, typename STORE, typename D> DefaultHash submit_core(Statistics& stats, const MAP& file, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			DefaultHash key, id;
 
@@ -270,7 +270,7 @@ namespace dircopy
 		}
 
 
-		template < typename STORE, typename D > BlockResult single_file(std::string_view name, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename STORE, typename D > BlockResult single_file(std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			BlockResult stats;
 
@@ -282,7 +282,7 @@ namespace dircopy
 		}
 
 
-		template < typename STORE, typename D> KeyResult submit_file(std::string_view name, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename STORE, typename D> KeyResult submit_file(std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			Statistics stats;
 
@@ -293,7 +293,7 @@ namespace dircopy
 			return { key, stats.direct };
 		}
 
-		template < typename STORE, typename D > std::vector<uint8_t> single_file2(Statistics& stats, std::string_view name, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename STORE, typename D > std::vector<uint8_t> single_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			mio::mmap_source file(name);
 
@@ -301,7 +301,7 @@ namespace dircopy
 		}
 
 
-		template < typename STORE, typename D> DefaultHash submit_file2(Statistics& stats, std::string_view name, const STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		template < typename STORE, typename D> DefaultHash submit_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
 			mio::mmap_source file(name);
 
@@ -309,9 +309,9 @@ namespace dircopy
 		}
 
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
 		{
-			for (auto& e : DITR(path))
+			for (auto& e : DITR(path,std::filesystem::directory_options::skip_permission_denied))
 			{
 				if (e.is_directory())
 					continue;
@@ -384,7 +384,7 @@ namespace dircopy
 				std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		}
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view delta_folder,Statistics& stats, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			delta::Path db(delta_folder);
 
@@ -393,7 +393,7 @@ namespace dircopy
 			return submit_file2(stats, db.Finalize(), store, domain, BLOCK, THREADS, compression, GROUP);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view delta_folder,std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			Statistics stats;
 
@@ -403,7 +403,7 @@ namespace dircopy
 		}
 
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view delta_folder, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			Statistics stats;
 
@@ -412,12 +412,12 @@ namespace dircopy
 			return { key, stats.direct };
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			return submit_folder< std::filesystem::directory_iterator>(delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0)
 		{
 			return submit_folder< std::filesystem::recursive_directory_iterator>(delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
 		}
@@ -426,7 +426,7 @@ namespace dircopy
 
 #ifdef _WIN32
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view delta_folder, Statistics& stats, std::string_view _path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			std::string full = std::filesystem::absolute(_path).string();
 
@@ -450,11 +450,44 @@ namespace dircopy
 			return r;
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view delta_folder, std::string_view path, const STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
 			auto r = vss_folder2(delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD);
+
+			return { r, stats.direct };
+		}
+
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_single2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		{
+			std::string full = std::filesystem::absolute(_path).string();
+
+			bool use_root = false;// full.size() != _path.size();
+
+			std::string path = full.substr(2);
+			std::string drive = full.substr(0, 1) + ":\\";
+
+			volsnap::win32::Snapshot sn(drive);
+
+			auto root = sn.Mount(std::filesystem::absolute(delta_folder).string() + "\\mount");
+
+			std::string vss_path; vss_path += root; vss_path += path;
+
+			size_t rel = std::count(vss_path.begin(), vss_path.end(), '\\') + std::count(vss_path.begin(), vss_path.end(), '/');
+
+			auto r = single_folder2(delta_folder, stats, vss_path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD, (use_root) ? drive : "", rel);
+
+			sn.Dismount();
+
+			return r;
+		}
+
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_single(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		{
+			Statistics stats;
+
+			auto r = vss_single2(delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD);
 
 			return { r, stats.direct };
 		}
