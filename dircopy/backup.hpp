@@ -308,7 +308,7 @@ namespace dircopy
 			return submit_core(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
 		}
 
-		template < typename DITR, typename ON_FILE > void core_delta(delta::Path& db, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel_count = 0)
+		template < typename DITR, typename ON_FILE > void core_delta(delta::Path& db, std::string_view path, ON_FILE && on_file, std::string_view drive = "", size_t rel_count = 0)
 		{
 			for (auto& e : DITR(path, std::filesystem::directory_options::skip_permission_denied))
 			{
@@ -350,7 +350,7 @@ namespace dircopy
 		}
 
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
 		{
 			for (auto& e : DITR(path,std::filesystem::directory_options::skip_permission_denied))
 			{
@@ -426,7 +426,7 @@ namespace dircopy
 				std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		}
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			delta::Path db(delta_folder);
 
@@ -435,24 +435,24 @@ namespace dircopy
 			return submit_file2(stats, db.Finalize(), store, domain, BLOCK, THREADS, compression, GROUP);
 		}
 
-		template < typename DITR, typename ON_FILE > void delta_folder(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		template < typename DITR, typename ON_FILE > void delta_folder(std::string_view snapshot, std::string_view path, ON_FILE && on_file, std::string_view drive = "", size_t rel = 0)
 		{
 			delta::Path db(snapshot);
 
 			core_delta<DITR>(db, path, on_file, drive, rel);
 		}
 
-		template < typename ON_FILE > void single_delta(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		template < typename ON_FILE > void single_delta(std::string_view snapshot, std::string_view path, ON_FILE && on_file, std::string_view drive = "", size_t rel = 0)
 		{
 			delta_folder< std::filesystem::directory_iterator >(snapshot, path, on_file, drive, rel);
 		}
 
-		template < typename ON_FILE> void recursive_delta(std::string_view snapshot, std::string_view path, ON_FILE on_file, std::string_view drive = "", size_t rel = 0)
+		template < typename ON_FILE> void recursive_delta(std::string_view snapshot, std::string_view path, ON_FILE && on_file, std::string_view drive = "", size_t rel = 0)
 		{
 			delta_folder< std::filesystem::recursive_directory_iterator >(snapshot, path, on_file, drive, rel);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			Statistics stats;
 
@@ -462,7 +462,7 @@ namespace dircopy
 		}
 
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			Statistics stats;
 
@@ -471,12 +471,12 @@ namespace dircopy
 			return { key, stats.direct };
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
 		{
 			return submit_folder< std::filesystem::directory_iterator>(delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0)
 		{
 			return submit_folder< std::filesystem::recursive_directory_iterator>(delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
 		}
@@ -485,7 +485,7 @@ namespace dircopy
 
 #ifdef _WIN32
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			std::string full = std::filesystem::absolute(_path).string();
 
@@ -509,7 +509,7 @@ namespace dircopy
 			return r;
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
@@ -518,7 +518,7 @@ namespace dircopy
 			return { r, stats.direct };
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_single2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_single2(std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			std::string full = std::filesystem::absolute(_path).string();
 
@@ -542,7 +542,7 @@ namespace dircopy
 			return r;
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_single(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_single(std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 

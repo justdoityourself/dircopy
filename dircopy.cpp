@@ -176,7 +176,13 @@ int main(int argc, char* argv[])
     {
         while (running)
         {
+            std::cout << current_file << " ";
+
             stats.Print();
+
+            std::cout << "\r";
+            std::cout.flush();
+
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     });
@@ -189,7 +195,7 @@ int main(int argc, char* argv[])
         {
             d8u::transform::DefaultHash result;
 
-            auto on_file = [&](auto size, auto time, auto name)
+            auto on_file = [&](auto & name, auto size, auto time)
             {
                 current_file = name;
 
