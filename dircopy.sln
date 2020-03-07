@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dircopy", "dircopy.vcxproj"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		AVX2|x64 = AVX2|x64
+		AVX2|x86 = AVX2|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
@@ -15,6 +17,10 @@ Global
 		Test|x86 = Test|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.AVX2|x64.ActiveCfg = AVX2|x64
+		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.AVX2|x64.Build.0 = AVX2|x64
+		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.AVX2|x86.ActiveCfg = AVX2|Win32
+		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.AVX2|x86.Build.0 = AVX2|Win32
 		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.Debug|x64.ActiveCfg = Debug|x64
 		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.Debug|x64.Build.0 = Debug|x64
 		{AA8CE4A0-37BC-4C83-943A-6F21FCC32497}.Debug|x86.ActiveCfg = Debug|Win32
