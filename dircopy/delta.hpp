@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "d8u/transform.hpp"
+#include "d8u/json.hpp"
 #include "tdb/database.hpp"
 
 namespace dircopy
@@ -12,6 +13,7 @@ namespace dircopy
 	namespace delta
 	{
 		using namespace d8u::transform;
+		using namespace d8u::json;
 
 		class Path
 		{
@@ -19,14 +21,18 @@ namespace dircopy
 			tdb::TinyHashmapSafe previous;
 			tdb::TinyHashmapSafe current;
 
+			JsonMap exclude;
+
 			std::string root;
 		public:
-			Path(std::string_view _root)
+			Path(std::string_view _root,std::string_view _exclude)
 				: change(string(_root) + "/change.db")
 				, previous(string(_root) + "/latest.db")
 				, current(string(_root) + "/tmp.db")
 				, root ( _root )
-			{ }
+				, exclude(_exclude)
+			{ 
+			}
 
 			std::string Finalize()
 			{
@@ -44,8 +50,33 @@ namespace dircopy
 				return string(root) + "/latest.db";
 			}
 
+			bool Excluded(std::string_view s)
+			{
+				auto path = exclude("path");
+				auto file = exclude("file")[s];
+
+				if (file)
+					return true;
+
+				bool exclude = false;
+
+				path.ForEachValue([&](auto key, auto value) 
+				{
+					if (s.size() >= key.size())
+					{
+						if(std::equal((char*)key.data(),(char*)key.data()+key.size(),s.begin(),s.begin() + key.size()))
+							exclude = true;
+					}
+				});
+
+				return exclude;
+			}
+
 			uint8_t* Queue(std::string_view s, uint64_t size, uint64_t when, uint64_t BLOCK, uint64_t MAX)
 			{
+				if (Excluded(s))
+					return nullptr;
+
 				auto key_payload = (size > MAX) ? 32 : 32 * (size / BLOCK + 1 /*FILE HASH*/ + ((size % BLOCK) ? 1 : 0));
 
 				auto b_size = bundle_size(s, size, when, key_payload);

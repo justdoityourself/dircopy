@@ -38,6 +38,7 @@ int main(int argc, char* argv[])
 #include "d8u/string_switch.hpp"
 #include "d8u/util.hpp"
 #include "d8u/transform.hpp"
+#include "d8u/json.hpp"
 
 #include "dircopy/backup.hpp"
 #include "dircopy/validate.hpp"
@@ -139,28 +140,32 @@ using namespace dircopy;
 
 int main(int argc, char* argv[])
 {
-    std::vector<uint8_t> vkey;
-    d8u::transform::DefaultHash dkey;
+    d8u::transform::DefaultHash key;
 
     bool vss = false, recursive = true;
-    string path = "", snapshot = "", host = "", image = "", action = "backup", key = "", dest = "";
+    string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "dircopy.json", sdomain="";
     size_t threads = 8;
     size_t files = 4;
     bool validate = false;
-    size_t compression = 5; //TODO enable
-    size_t block_grouping = 16; //TODO enable
-    auto domain = d8u::util::default_domain; //TODO enable
+
+    size_t compression = 5;
+    size_t block_grouping = 16;
+    std::vector<uint8_t> domain;
 
     auto cli = (
-        option("-k", "--key").doc("The store key used to restore, mount or validate") & value("key", key),
+        option("-c", "--config").doc("Json configuration file") & value("json", json),
+        option("-k", "--key").doc("The store key used to restore, mount or validate") & value("key", skey),
         option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate") & value("action", action),
         option("-s", "--snapshot").doc("A path where snapshot databases are stored") & value("snapshot", snapshot),
         option("-i", "--image").doc("Path of the image: D:\\Backup") & value("image", image),
         option("-h", "--host").doc("Hostname or IP of  store: backup.com, 192.168.4.14") & value("host", host),
         option("-p", "--path").doc("Path to backup") & value("directory", path),
         option("-d", "--destination").doc("Path to backup") & value("destination", dest),
+        option("-o", "--domain").doc("Block identification salt") & value("domain", sdomain),
         option("-t", "--threads").doc("Threads used to encode / decode") & value("threads", threads),
-        option("-f", "--files").doc("Files processed at a time") & value("threads", threads),
+        option("-b", "--blockgroup").doc("Group size of identification query") & value("block_grouping", block_grouping),
+        option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
+        option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
         option("-x", "--validate").doc("Use vss snapshot").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive)
@@ -189,6 +194,33 @@ int main(int argc, char* argv[])
 
     try
     {
+        if (json.size() && std::filesystem::exists(json))
+        {
+            d8u::json::JsonMap map(json);
+
+            map.ForEachValue([&](auto key, auto value)
+            {
+                switch(switch_t(key))
+                {
+                case switch_t("vss"):   vss = value;    break;
+                case switch_t("key"):   skey = value;   break;
+                case switch_t("host"):  host = value;   break;
+                case switch_t("path"):  path = value;   break;
+                case switch_t("files"):     files = value;      break;
+                case switch_t("image"):     image = value;      break;
+                case switch_t("action"):    action = value;     break;
+                case switch_t("domain"):    sdomain = value;    break;
+                case switch_t("threads"):   threads = value;    break;
+                case switch_t("snapshot"):      snapshot = value;       break;
+                case switch_t("validate"):      validate = value;       break;
+                case switch_t("recursive"):     recursive = value;      break;
+                case switch_t("blockgroup"):    block_grouping = value; break;
+                case switch_t("destination"):   dest = value;           break;
+                case switch_t("compression"):   compression = value;    break;
+                }
+            });
+        }
+
         if (!parse(argc, argv, cli) || ( !image.size() && !host.size() ))
             std::cout << make_man_page(cli, argv[0]);
         else
@@ -213,12 +245,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_folder2(snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_single2(snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_single2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
 #else
                         std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -229,12 +261,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::recursive_folder2(snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::recursive_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::single_folder2(snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::single_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                     }
 
@@ -245,7 +277,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::folder2(stats,dkey, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::folder2(stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << "Validation Success" << std::endl;
                     else
                         std::cout << "Error Detected" << std::endl;
@@ -254,7 +286,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory Deep: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::deep_folder2(stats,dkey, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::deep_folder2(stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << std::endl << "Validation Success" << std::endl;
                     else
                         std::cout << std::endl << "Error Detected" << std::endl;
@@ -265,14 +297,14 @@ int main(int argc, char* argv[])
                     console.join();
 
                     if (recursive)
-                        backup::recursive_delta(snapshot, path, [](auto name, auto size, auto time)
+                        backup::recursive_delta(json,snapshot, path, [](auto name, auto size, auto time)
                         {
                             std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
 
                             return true;
                         });
                     else
-                        backup::single_delta(snapshot, path, [](auto name, auto size, auto time)
+                        backup::single_delta(json,snapshot, path, [](auto name, auto size, auto time)
                         {
                             std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
 
@@ -284,7 +316,7 @@ int main(int argc, char* argv[])
                 {
                     std::cout << "Search: " << path << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    mount::Path handle(dkey,store,domain,validate);
+                    mount::Path handle(key,store,domain,validate);
 
                     running = false;
                     console.join();
@@ -307,14 +339,14 @@ int main(int argc, char* argv[])
 
                     std::filesystem::create_directories(path);
 
-                    restore::folder2(stats, path, dkey, store, domain, validate, validate, 1024 * 1024, 128* 1024 * 1024, threads, files);
+                    restore::folder2(stats, path, key, store, domain, validate, validate, 1024 * 1024, 128* 1024 * 1024, threads, files);
 
                     break;
                 case switch_t("fetch"):
                 {
                     std::cout << "Fetch: " << path << " >> " << dest << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    mount::Path handle(dkey, store, domain, validate);
+                    mount::Path handle(key, store, domain, validate);
 
                     running = false;
                     console.join();
@@ -328,7 +360,7 @@ int main(int argc, char* argv[])
                 {
                     std::cout << "Enumerate: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    mount::Path handle(dkey, store, domain, validate);
+                    mount::Path handle(key, store, domain, validate);
 
                     running = false;
                     console.join();
@@ -346,13 +378,21 @@ int main(int argc, char* argv[])
                 }
             };
 
-            if (key.size())
+            if (sdomain.size())
+                domain = d8u::util::to_bin(sdomain);
+            else
             {
-                vkey = d8u::util::to_bin(key);
+                domain.resize(d8u::util::default_domain.size());
+                std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
+            }
+
+            if (skey.size())
+            {
+                auto vkey = d8u::util::to_bin(skey);
                 if (vkey.size() != 32)
                     throw std::runtime_error("Bad input key");
 
-                std::copy(vkey.begin(), vkey.end(), dkey.begin());
+                std::copy(vkey.begin(), vkey.end(), key.begin());
             }
                 
 
