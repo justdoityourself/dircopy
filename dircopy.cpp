@@ -171,8 +171,8 @@ int main(int argc, char* argv[])
         option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
-        option("-z", "--server").doc("Use vss snapshot").set(storage_server),
-        option("-x", "--validate").doc("Use vss snapshot").set(validate),
+        option("-z", "--server").doc("Host block storage server").set(storage_server),
+        option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive)
         );
 
@@ -226,7 +226,9 @@ int main(int argc, char* argv[])
             });
         }
 
-        if (!parse(argc, argv, cli) || ( !image.size() && !host.size() ))
+        if (!parse(argc, argv, cli))
+            std::cout << make_man_page(cli, argv[0]);
+        else if (!image.size() && !host.size() && !storage_server )
             std::cout << make_man_page(cli, argv[0]);
         else
         {
