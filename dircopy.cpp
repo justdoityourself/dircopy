@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
     d8u::transform::DefaultHash key;
 
     bool vss = false, recursive = true, storage_server = false;
-    string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "dircopy.json", sdomain="";
+    string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
     size_t threads = 8;
     size_t files = 4;
     bool validate = false;
@@ -177,7 +177,8 @@ int main(int argc, char* argv[])
         );
 
     bool running = true;
-    d8u::util::Statistics stats;
+    d8u::util::Statistics _stats;
+    d8u::util::Statistics* pstats = &_stats;
     std::string current_file;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -188,7 +189,7 @@ int main(int argc, char* argv[])
         {
             std::cout << current_file << " ";
 
-            stats.Print();
+            pstats->Print();
 
             std::cout << "\r";
             std::cout.flush();
@@ -199,6 +200,12 @@ int main(int argc, char* argv[])
 
     try
     {
+        if (!parse(argc, argv, cli))
+        {
+            std::cout << make_man_page(cli, argv[0]);
+            throw std::runtime_error("Bad CLI");
+        }
+
         if (json.size() && std::filesystem::exists(json))
         {
             d8u::json::JsonMap map(json);
@@ -226,9 +233,7 @@ int main(int argc, char* argv[])
             });
         }
 
-        if (!parse(argc, argv, cli))
-            std::cout << make_man_page(cli, argv[0]);
-        else if (!image.size() && !host.size() && !storage_server )
+        if (!image.size() && !host.size() && !storage_server )
             std::cout << make_man_page(cli, argv[0]);
         else
         {
@@ -252,12 +257,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_single2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
 #else
                         std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -268,12 +273,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::recursive_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::single_folder2(json,snapshot, stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
                         }
                     }
 
@@ -284,7 +289,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::folder2(stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::folder2(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << "Validation Success" << std::endl;
                     else
                         std::cout << "Error Detected" << std::endl;
@@ -293,7 +298,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory Deep: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::deep_folder2(stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::deep_folder2(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << std::endl << "Validation Success" << std::endl;
                     else
                         std::cout << std::endl << "Error Detected" << std::endl;
@@ -346,7 +351,7 @@ int main(int argc, char* argv[])
 
                     std::filesystem::create_directories(path);
 
-                    restore::folder2(stats, path, key, store, domain, validate, validate, 1024 * 1024, 128* 1024 * 1024, threads, files);
+                    restore::folder2(_stats, path, key, store, domain, validate, validate, 1024 * 1024, 128* 1024 * 1024, threads, files);
 
                     break;
                 case switch_t("fetch"):
@@ -387,10 +392,9 @@ int main(int argc, char* argv[])
 
             if (storage_server)
             {
-                running = false;
-                console.join();
-
                 StorageService service(path, threads);
+
+                pstats = service.Stats();
 
                 service.Join();
             }
@@ -439,16 +443,13 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if (!storage_server)
+    if (running)
     {
-        if (running)
-        {
-            running = false;
-            console.join();
-        }
-
-        stats.Print();
+        running = false;
+        console.join();
     }
+
+    pstats->Print();
 
     std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
 

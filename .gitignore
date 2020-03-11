@@ -1,4 +1,4 @@
-
+snap/*
 .vs/*
 x64/*
 test/*
@@ -6,3 +6,4 @@ delta/*
 altdelta/*
 teststore/*
 cli/*
+backup.json

@@ -36,6 +36,7 @@ TEST_CASE("File Exclusion", "[dircopy::backup]")
         "file": 
 		{ 
 			"testdata\large_compress":true,
+			"testdata\empty":true,
 			"testdata\small_compress":true,
 			"testdata\tiny_compress":true,
 			"testdata\tiny_nocompress":true,
@@ -156,7 +157,7 @@ TEST_CASE("Mount", "[dircopy::backup/restore]")
 		return true;
 	});
 
-	CHECK(5 == count);
+	CHECK(6 == count);
 
 	std::filesystem::remove_all("mount");
 	std::filesystem::remove_all("delta");

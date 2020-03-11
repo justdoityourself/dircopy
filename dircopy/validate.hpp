@@ -169,6 +169,9 @@ namespace dircopy
 
 					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
 
+					if (!size)
+						return res;
+
 					if (keys.size() == 1)
 					{
 						/*if (keys.size() != 1)

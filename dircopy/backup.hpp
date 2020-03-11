@@ -274,6 +274,9 @@ namespace dircopy
 		{
 			BlockResult stats;
 
+			if (std::filesystem::file_size(name) == 0)
+				return stats;
+
 			mio::mmap_source file(name);
 
 			stats.key_list = core_file<STORE, D, BLOCK, THREADS>(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
@@ -286,6 +289,9 @@ namespace dircopy
 		{
 			Statistics stats;
 
+			if (std::filesystem::file_size(name) == 0)
+				return { DefaultHash(), stats.direct };
+
 			mio::mmap_source file(name);
 
 			auto key = submit_core(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
@@ -295,6 +301,9 @@ namespace dircopy
 
 		template < typename STORE, typename D > std::vector<uint8_t> single_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
+			if (std::filesystem::file_size(name) == 0)
+				return std::vector<uint8_t>();
+
 			mio::mmap_source file(name);
 
 			return core_file(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
@@ -303,6 +312,9 @@ namespace dircopy
 
 		template < typename STORE, typename D> DefaultHash submit_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
+			if (std::filesystem::file_size(name) == 0)
+				return DefaultHash();
+
 			mio::mmap_source file(name);
 
 			return submit_core(stats, file, store, domain, BLOCK, THREADS, compression, GROUP);
@@ -359,6 +371,8 @@ namespace dircopy
 			{
 				if (e.is_directory())
 					continue;
+
+				stats.atomic.items++;
 
 				uint64_t change_time = GetFileWriteTime(e);
 				auto rel = e.path().string();//auto rel = std::filesystem::absolute(e.path()).string();
