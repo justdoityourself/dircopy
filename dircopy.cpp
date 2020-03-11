@@ -26,6 +26,9 @@ int main(int argc, char* argv[])
 
 #include "volstore/image.hpp"
 #include "volstore/binary.hpp"
+#include "volstore/api.hpp"
+
+
 
 #include "clipp.h"
 
@@ -48,6 +51,7 @@ using std::string;
 using namespace clipp;
 using d8u::switch_t;
 using namespace dircopy;
+using namespace volstore::api;
 
 /*
     CLI:
@@ -142,7 +146,7 @@ int main(int argc, char* argv[])
 {
     d8u::transform::DefaultHash key;
 
-    bool vss = false, recursive = true;
+    bool vss = false, recursive = true, storage_server = false;
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "dircopy.json", sdomain="";
     size_t threads = 8;
     size_t files = 4;
@@ -167,6 +171,7 @@ int main(int argc, char* argv[])
         option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
+        option("-z", "--server").doc("Use vss snapshot").set(storage_server),
         option("-x", "--validate").doc("Use vss snapshot").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive)
         );
@@ -378,39 +383,51 @@ int main(int argc, char* argv[])
                 }
             };
 
-            if (sdomain.size())
-                domain = d8u::util::to_bin(sdomain);
-            else
+            if (storage_server)
             {
-                domain.resize(d8u::util::default_domain.size());
-                std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
-            }
+                running = false;
+                console.join();
 
-            if (skey.size())
-            {
-                auto vkey = d8u::util::to_bin(skey);
-                if (vkey.size() != 32)
-                    throw std::runtime_error("Bad input key");
+                StorageService service(path, threads);
 
-                std::copy(vkey.begin(), vkey.end(), key.begin());
-            }
-                
-
-            if (snapshot.size())
-                std::filesystem::create_directories(snapshot);
-
-            if (image.size())
-                std::filesystem::create_directories(image);
-            
-            if (image.size())
-            {
-                volstore::Image store(image);
-                do_switch(store);
+                service.Join();
             }
             else
             {
-                volstore::BinaryStoreClient store(host + ":9009", host + ":1010", host + ":1111");
-                do_switch(store);
+                if (sdomain.size())
+                    domain = d8u::util::to_bin(sdomain);
+                else
+                {
+                    domain.resize(d8u::util::default_domain.size());
+                    std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
+                }
+
+                if (skey.size())
+                {
+                    auto vkey = d8u::util::to_bin(skey);
+                    if (vkey.size() != 32)
+                        throw std::runtime_error("Bad input key");
+
+                    std::copy(vkey.begin(), vkey.end(), key.begin());
+                }
+
+
+                if (snapshot.size())
+                    std::filesystem::create_directories(snapshot);
+
+                if (image.size())
+                    std::filesystem::create_directories(image);
+
+                if (image.size())
+                {
+                    volstore::Image store(image);
+                    do_switch(store);
+                }
+                else
+                {
+                    volstore::BinaryStoreClient store(host + ":9009", host + ":1010", host + ":1111");
+                    do_switch(store);
+                }
             }
         }
     }
@@ -420,17 +437,18 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if (running)
+    if (!storage_server)
     {
-        running = false;
-        console.join();
+        if (running)
+        {
+            running = false;
+            console.join();
+        }
+
+        stats.Print();
     }
 
-    auto finish = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration<double> elapsed = finish - start;
-
-    stats.Print();
+    std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
 
     std::cout << std::endl << "Finished in: " << elapsed.count() << "s" << std::endl;
 
