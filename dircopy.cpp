@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
     d8u::util::Statistics _stats;
     d8u::util::Statistics* pstats = &_stats;
     StorageService* pservice = nullptr;
-    std::string current_file;
+    std::string current_file,pk;
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -303,7 +303,7 @@ int main(int argc, char* argv[])
                         }
                     }
 
-                    std::cout << "Key: " << d8u::util::to_hex(result) << std::endl << std::endl;
+                    pk = d8u::util::to_hex(result);
 
                     break;
                 case switch_t("validate"):
@@ -472,6 +472,8 @@ int main(int argc, char* argv[])
     }
 
     pstats->Print();
+
+    std::cout << "Key: " << pk << std::endl << std::endl;
 
     std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
 
