@@ -31,6 +31,9 @@ TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 	constexpr auto itr_count = 1;
 	constexpr auto folder_size = util::_mb(100);
 
+	volrng::DISK::Dismount("tempdisk\\disk.img");
+	volrng::DISK::Dismount("resdisk.img");
+
 	std::filesystem::remove_all("tempdisk");
 	std::filesystem::remove_all("resdisk.img");
 	std::filesystem::remove_all("testsnap");
@@ -44,26 +47,42 @@ TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 		volrng::volume::Test<volrng::DISK> handle("tempdisk");
 		volstore::api::StorageService service("teststore", 4);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-
-		volstore::BinaryStoreClient store;
-
 		for (size_t i = 0; i < itr_count; i++)
 		{
 			handle.Run(folder_size, volrng::MOUNT);
 
 			handle.Mount(volrng::MOUNT);
 
-			auto result = backup::vss_folder("", "testsnap", volrng::MOUNT, store,
-				[](auto&, auto, auto) { return true; },
-				util::default_domain, 64, util::_mb(1), 64, 5, 64, util::_mb(64));
+			backup::KeyResult result;
+
+			{
+				volstore::BinaryStoreClient store;
+
+				result = backup::vss_folder("", "testsnap", volrng::MOUNT, store,
+					[](auto&, auto, auto) { return true; },
+					util::default_domain, 64, util::_mb(1), 64, 5, 64, util::_mb(64));
+			}
 
 			handle.Dismount();
 
 			{
+				volstore::BinaryStoreClient store;
+				CHECK(true == validate::folder(result.key, store, util::default_domain, util::_mb(1), util::_mb(64), 64, 64).first);
+			}
+
+			{
+				volstore::BinaryStoreClient store;
+				CHECK(true == validate::deep_folder(result.key, store, util::default_domain, util::_mb(1), util::_mb(64), 64, 64).first);
+			}
+
+			{
 				volrng::DISK res_disk("resdisk.img", util::_gb(100), volrng::MOUNT2);
 
-				restore::folder(volrng::MOUNT2, result.key, store, util::default_domain, true, true, util::_mb(1), util::_mb(64), 64, 64);
+				{
+					volstore::BinaryStoreClient store;
+					restore::folder(volrng::MOUNT2, result.key, store, util::default_domain, true, true, util::_mb(1), util::_mb(64), 64, 64);
+				}
+
 				CHECK(handle.Validate(volrng::MOUNT2));
 			}
 
@@ -75,6 +94,53 @@ TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 	std::filesystem::remove_all("tempdisk");
 	std::filesystem::remove_all("testsnap");
 	std::filesystem::remove_all("teststore");
+}
+
+
+TEST_CASE("Folder", "[dircopy::backup/restore]")
+{
+	std::filesystem::remove_all("restore1");
+	std::filesystem::remove_all("delta");
+	std::filesystem::remove_all("altdelta");
+	std::filesystem::remove_all("restore2");
+	std::filesystem::remove_all("restore3");
+	std::filesystem::remove_all("teststore");
+	std::filesystem::create_directories("teststore");
+	std::filesystem::create_directories("restore1");
+	std::filesystem::create_directories("restore2");
+	std::filesystem::create_directories("restore3");
+
+	volstore::Simple store("teststore");
+
+	auto result1 = backup::recursive_folder("", "delta", "testdata", store,
+		[](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
+	auto result2 = backup::recursive_folder("", "delta", "testdata", store,
+		[](auto&, auto, auto) { return true; }, util::default_domain, 3, 1024 * 1024, 6, 5, 1, 64 * 1024 * 1024);
+	auto result3 = backup::vss_folder("", "altdelta", "testdata", store,
+		[](auto&, auto, auto) { return true; }, util::default_domain, 16, 1024 * 1024, 16, 5, 16, 64 * 1024 * 1024);
+
+
+	CHECK(std::equal(result1.key.begin(), result1.key.end(), result2.key.begin()));
+	CHECK(result3.stats.duplicate == result1.stats.read);
+
+	CHECK(validate::folder(result2.key, store, util::default_domain, 1024 * 1024, 64 * 1024 * 1024, 4, 4).first);
+	CHECK(validate::deep_folder(result2.key, store, util::default_domain, 1024 * 1024, 64 * 1024 * 1024, 4, 4).first);
+
+	restore::folder("restore1", result1.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8, 8);
+	CHECK(compare::folders("testdata", "restore1", 8));
+
+	restore::folder("restore2", result2.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8, 8);
+	CHECK(compare::folders("testdata", "restore2", 8));
+
+	restore::folder("restore3", result3.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8, 8);
+	CHECK(compare::folders("testdata", "restore3", 8));
+
+	std::filesystem::remove_all("teststore");
+	std::filesystem::remove_all("restore1");
+	std::filesystem::remove_all("restore2");
+	std::filesystem::remove_all("restore3");
+	std::filesystem::remove_all("delta");
+	std::filesystem::remove_all("altdelta");
 }
 
 TEST_CASE("File Exclusion", "[dircopy::backup]")
@@ -138,6 +204,9 @@ TEST_CASE("Comprehensive folder structure (Image)", "[dircopy::backup/restore]")
 {
 	constexpr auto itr_count = 3;
 	constexpr auto folder_size = util::_mb(100);
+
+	volrng::DISK::Dismount("tempdisk\\disk.img");
+	volrng::DISK::Dismount("resdisk.img");
 
 	std::filesystem::remove_all("tempdisk");
 	std::filesystem::remove_all("resdisk.img");
@@ -210,7 +279,7 @@ TEST_CASE("Mount", "[dircopy::backup/restore]")
 		return true;
 	});
 
-	CHECK(6 == count);
+	CHECK(6 + 1 /*Stats*/ == count);
 
 	std::filesystem::remove_all("mount");
 	std::filesystem::remove_all("delta");
@@ -308,48 +377,4 @@ TEST_CASE("No Compress File", "[dircopy::backup/restore]")
 }
 
 
-TEST_CASE("Folder", "[dircopy::backup/restore]")
-{
-	std::filesystem::remove_all("restore1");
-	std::filesystem::remove_all("delta");
-	std::filesystem::remove_all("altdelta");
-	std::filesystem::remove_all("restore2");
-	std::filesystem::remove_all("restore3");
-	std::filesystem::remove_all("teststore");
-	std::filesystem::create_directories("teststore");
-	std::filesystem::create_directories("restore1");
-	std::filesystem::create_directories("restore2");
-	std::filesystem::create_directories("restore3");
 
-	volstore::Simple store("teststore");
-
-	auto result1 = backup::recursive_folder("", "delta","testdata", store,
-		[](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
-	auto result2 = backup::recursive_folder("", "delta", "testdata", store,
-		[](auto&, auto, auto) { return true; }, util::default_domain, 3, 1024 * 1024, 6, 5, 1, 64 * 1024 * 1024);
-	auto result3 = backup::vss_folder("", "altdelta", "testdata", store,
-		[](auto&, auto, auto) { return true; }, util::default_domain, 16, 1024 * 1024, 16, 5, 16, 64 * 1024 * 1024);
-
-
-	CHECK(std::equal(result1.key.begin(), result1.key.end(), result2.key.begin()));
-	CHECK(result3.stats.duplicate == result1.stats.read);
-
-	CHECK(validate::folder(result2.key, store, util::default_domain, 1024 * 1024, 64 * 1024 * 1024,4,4).first);
-	CHECK(validate::deep_folder(result2.key, store, util::default_domain, 1024 * 1024, 64 * 1024 * 1024,4,4).first);
-
-	restore::folder("restore1", result1.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8,8);
-	CHECK(compare::folders("testdata", "restore1",8));
-
-	restore::folder("restore2", result2.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8,8);
-	CHECK(compare::folders("testdata", "restore2",8));
-
-	restore::folder("restore3", result3.key, store, util::default_domain, true, true, 1024 * 1024, 64 * 1024 * 1024, 8,8);
-	CHECK(compare::folders("testdata", "restore3",8));
-
-	std::filesystem::remove_all("teststore");
-	std::filesystem::remove_all("restore1");
-	std::filesystem::remove_all("restore2");
-	std::filesystem::remove_all("restore3");
-	std::filesystem::remove_all("delta");
-	std::filesystem::remove_all("altdelta");
-}

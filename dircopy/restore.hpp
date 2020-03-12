@@ -176,6 +176,14 @@ namespace dircopy
 
 			tdb::MemoryHashmap db(database);
 
+			{
+				auto [size, time, name, data] = delta::Path::DecodeRaw(db.FindObject(domain));
+
+				auto stats = (delta::Path::FolderStatistics * )data.data();
+
+				s.direct.target = stats->size;
+			}
+
 			auto file = [&](uint64_t p)
 			{
 				dec_scope lock(files);
@@ -184,6 +192,9 @@ namespace dircopy
 
 				if (!size)
 				{
+					if (name.size() > 3 && name[0] == '|' && name[1] == '|' && name[2] == '|')
+						return true; //Stats block
+
 					d8u::util::empty_file(std::string(dest) + "\\" + string(name));
 					return true;
 				}

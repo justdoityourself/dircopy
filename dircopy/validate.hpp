@@ -43,7 +43,7 @@ namespace dircopy
 				auto block = store.Read(file_id);
 
 				stats.atomic.blocks++;
-				stats.atomic.read += block.size();
+				stats.atomic.write += block.size();
 
 				decode(domain, block, key);
 
@@ -70,7 +70,7 @@ namespace dircopy
 				auto file_record = store.Read(file_id);
 
 				stats.atomic.blocks++;
-				stats.atomic.read += file_record.size();
+				stats.atomic.write += file_record.size();
 
 				decode(domain, file_record, file_key);
 
@@ -163,6 +163,14 @@ namespace dircopy
 				tdb::MemoryHashmap db(database);
 				bool res = true;
 
+				{
+					auto [size, time, name, data] = delta::Path::DecodeRaw(db.FindObject(domain));
+
+					auto stats = (delta::Path::FolderStatistics*)data.data();
+
+					s.direct.target = stats->size;
+				}
+
 				auto file = [&](uint64_t p)
 				{
 					dec_scope lock(files);
@@ -194,6 +202,8 @@ namespace dircopy
 								return res = false;
 						}
 					}
+
+					s.atomic.read += size;
 
 					return res;
 				};

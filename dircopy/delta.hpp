@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "d8u/transform.hpp"
+#include "d8u/util.hpp"
 #include "d8u/json.hpp"
 #include "tdb/database.hpp"
 
@@ -32,6 +33,38 @@ namespace dircopy
 				, root ( _root )
 				, exclude(_exclude)
 			{ 
+			}
+
+			struct FolderStatistics
+			{
+				uint64_t target;
+				uint64_t size;
+				uint64_t blocks;
+				uint64_t files;
+			};
+
+			template<typename T> void Statistics(d8u::util::Statistics& _stats, const T& domain)
+			{
+				FolderStatistics stats;
+
+				stats.target = _stats.direct.target;
+				stats.size = _stats.direct.read;
+				stats.blocks = _stats.direct.blocks;
+				stats.files = _stats.direct.items;
+
+				auto b_size = bundle_size("|||Backup Statistics|||", sizeof(FolderStatistics));
+
+				auto [queue, off] = current.Incidental(b_size);
+
+				*(uint32_t*)(queue) = (uint32_t)b_size;
+
+				current.Insert(domain, off);
+
+				//There used to be a time stamp in this object. This however caused deduplication of metadata to always fail.
+				//NO TIME STAMPS.
+				//
+
+				stream(queue, b_size, "|||Backup Statistics|||", 0, 0, gsl::span<uint8_t>((uint8_t*)&stats,sizeof(FolderStatistics)));
 			}
 
 			std::string Finalize()
@@ -79,7 +112,7 @@ namespace dircopy
 
 				auto key_payload = (size > MAX) ? 32 : 32 * (size / BLOCK + 1 /*FILE HASH*/ + ((size % BLOCK) ? 1 : 0));
 
-				auto b_size = bundle_size(s, size, when, key_payload);
+				auto b_size = bundle_size(s, key_payload);
 				auto [queue, off] = current.Incidental(b_size);
 
 				*(uint32_t*)(queue) = (uint32_t)b_size;
@@ -139,9 +172,25 @@ namespace dircopy
 				return std::make_tuple(size, time, name, data);
 			}
 
+			static auto DecodeRaw(uint8_t* p)
+			{
+				uint32_t extent = *(uint32_t*)p;
+				uint64_t size = *(uint64_t*)(p + 4);
+				uint64_t time = *(uint64_t*)(p + 12);
+				uint16_t ns = *(uint16_t*)(p + 20);
+
+				std::string_view name((char*)(p + 22), ns);
+
+				uint16_t ds = *(uint16_t*)(p + 22 + ns);
+
+				span<uint8_t> data((p + 24 + ns), ds);
+
+				return std::make_tuple(size, time, name, data);
+			}
+
 		private:
 
-			size_t bundle_size(std::string_view s, uint64_t size, uint64_t when, size_t k_size)
+			size_t bundle_size(std::string_view s, size_t k_size)
 			{
 				return sizeof(uint32_t) + sizeof(uint64_t) * 2 + sizeof(uint16_t) * 2 + s.size()  + k_size;
 			}

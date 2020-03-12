@@ -271,9 +271,8 @@ namespace dircopy
 
 			std::tie(key, id) = identify(domain, result);
 
-			if (store.Is(id))
+			if (store.Is(id)) //TODO METADATA is not reported on this function
 				return key;
-
 
 			//Write unique block:
 			//
@@ -425,8 +424,12 @@ namespace dircopy
 				if (!queue) //Excluded
 					return;
 
-				if (!db.Changed(rel, size, change_time,queue))
+				if (!db.Changed(rel, size, change_time, queue))
+				{
+					stats.atomic.read += size;
+					stats.atomic.blocks += (size / BLOCK +((size%BLOCK) ? 1 : 0) /*+ ((size >= LARGE_THRESHOLD) ? 1 : 0) ... use this when the large file metadata is fixed*/);
 					continue;
+				}
 
 				auto _file = [&](std::string handle, std::string name, uint64_t size, uint64_t changed, uint8_t* queue)
 				{
@@ -472,6 +475,8 @@ namespace dircopy
 			delta::Path db(delta_folder,exclude);
 
 			core_folder<DITR>(db,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+
+			db.Statistics(stats,domain);
 
 			return submit_file2(stats, db.Finalize(), store, domain, BLOCK, THREADS, compression, GROUP);
 		}
