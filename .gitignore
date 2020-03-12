@@ -8,3 +8,4 @@ teststore/*
 cli/*
 backup.json
 tempdisk/*
+store/*

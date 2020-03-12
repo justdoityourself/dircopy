@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
 {
     d8u::transform::DefaultHash key;
 
-    bool vss = false, recursive = true, storage_server = false;
+    bool vss = false, recursive = true, storage_server = false, scope = false;
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
     size_t threads = 8;
     size_t files = 4;
@@ -171,6 +171,7 @@ int main(int argc, char* argv[])
         option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
+        option("-p", "--scope").doc("Use vss snapshot").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive)
@@ -187,12 +188,9 @@ int main(int argc, char* argv[])
     {
         while (running)
         {
-            std::cout << current_file << " ";
-
             pstats->Print();
 
-            std::cout << "\r";
-            std::cout.flush();
+            std::cout << " " << current_file << "\t\t\r" << std::flush;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
@@ -219,6 +217,7 @@ int main(int argc, char* argv[])
                 case switch_t("host"):  host = value;   break;
                 case switch_t("path"):  path = value;   break;
                 case switch_t("files"):     files = value;      break;
+                case switch_t("scope"):     scope = value;      break;
                 case switch_t("image"):     image = value;      break;
                 case switch_t("action"):    action = value;     break;
                 case switch_t("domain"):    sdomain = value;    break;
@@ -237,11 +236,29 @@ int main(int argc, char* argv[])
             std::cout << make_man_page(cli, argv[0]);
         else
         {
+            if (scope && path.size() && snapshot.size())
+            {
+                if (recursive)
+                    _stats.direct.target = backup::recursive_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true; });
+                else
+                    _stats.direct.target = backup::single_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true;  });
+            }
+
             d8u::transform::DefaultHash result;
 
             auto on_file = [&](auto & name, auto size, auto time)
             {
-                current_file = name;
+                auto pos1 = name.rfind("/");
+                if (pos1 == std::string::npos)
+                    pos1 = 0;
+
+                auto pos2 = name.rfind("\\");
+                if (pos2 == std::string::npos)
+                    pos2 = 0;
+
+                auto pos = (pos1 > pos2) ? pos1 : pos2;
+
+                current_file = name.substr(pos+1);
 
                 return true;
             };
@@ -431,7 +448,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    volstore::BinaryStoreClient store(host + ":9009", host + ":1010", host + ":1111");
+                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", host + ":9009", host + ":1010", host + ":1111");
                     do_switch(store);
                 }
             }

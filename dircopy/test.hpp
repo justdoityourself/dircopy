@@ -42,9 +42,9 @@ TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 
 	{
 		volrng::volume::Test<volrng::DISK> handle("tempdisk");
-		volstore::api::StorageService service("teststore", 1);
+		volstore::api::StorageService service("teststore", 4);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
 		volstore::BinaryStoreClient store;
 
