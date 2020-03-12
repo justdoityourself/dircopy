@@ -180,6 +180,7 @@ int main(int argc, char* argv[])
     bool running = true;
     d8u::util::Statistics _stats;
     d8u::util::Statistics* pstats = &_stats;
+    StorageService* pservice = nullptr;
     std::string current_file;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -190,7 +191,10 @@ int main(int argc, char* argv[])
         {
             pstats->Print();
 
-            std::cout << " " << current_file << "\t\t\r" << std::flush;
+            if(pservice)
+                std::cout << " C: " << pservice->ConnectionCount() << "\r" << std::flush;
+            else
+                std::cout << " " << current_file << "\t\t\r" << std::flush;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
@@ -410,6 +414,7 @@ int main(int argc, char* argv[])
             if (storage_server)
             {
                 StorageService service(path, threads);
+                pservice = &service;
 
                 pstats = service.Stats();
 

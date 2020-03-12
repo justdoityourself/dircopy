@@ -7,5 +7,6 @@ altdelta/*
 teststore/*
 cli/*
 backup.json
+backup_medium.json
 tempdisk/*
 store/*
