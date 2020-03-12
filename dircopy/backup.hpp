@@ -50,29 +50,6 @@ namespace dircopy
 			Direct stats;
 		};
 
-		//CODE for single group
-		/* GROUP == 1
-		if (store.Is(id))
-		{
-			stats.atomic.duplicate += cur;
-			stats.atomic.dblocks++;
-			continue;
-		}
-
-		if (THREADS == 1)
-			save(map_segment);
-		else
-		{
-			while (stats.atomic.threads.load() >= THREADS) //This will not be exact if multiple files are processed at the same time, a few more threads will be run than the limit. Use CMP_EXCHANGE. Worse case this causes overthrottling.
-				std::this_thread::sleep_for(std::chrono::milliseconds(50)); // SHOULD be the time it takes for one block to be encoded.
-
-			stats.atomic.threads++;
-			local_threads++;
-
-			std::thread( save, map_segment).detach();
-		}
-		*/
-
 		template < typename STORE, typename D > DefaultHash block(Statistics& stats, std::vector<uint8_t>& buffer, STORE& store, const D& domain = default_domain, int compression = 5)
 		{
 			stats.atomic.read += buffer.size(); stats.atomic.blocks++;
@@ -157,7 +134,14 @@ namespace dircopy
 
 			auto push_group = [&]()
 			{
-				auto bitmap = std::bitset<64>(store.Many<sizeof(DefaultHash)>(span<uint8_t>((uint8_t*)ids.data(), ids.size() * sizeof(DefaultHash))));
+				uint64_t _bitmap;
+
+				if (ids.size() > 1)
+					_bitmap = store.Many<sizeof(DefaultHash)>(span<uint8_t>((uint8_t*)ids.data(), ids.size() * sizeof(DefaultHash)));
+				else
+					_bitmap = (uint64_t)store.Is(*ids.begin());
+
+				auto bitmap = std::bitset<64>(_bitmap);
 
 				for (size_t i = 0; i < group.size(); i++)
 				{
@@ -210,19 +194,48 @@ namespace dircopy
 				//
 
 				DefaultHash key, id; std::tie(key, id) = identify(domain, seg);
-				ids.push_back(id);
 				result.insert(result.end(), key.begin(), key.end());
 
-				group.push_back(std::make_pair(key, seg));
+				if (GROUP == 1)
+				{
+					if (store.Is(id))
+					{
+						stats.atomic.duplicate += cur;
+						stats.atomic.dblocks++;
+						continue;
+					}
 
-				if (group.size() == GROUP)
-					push_group();
+					if (THREADS == 1)
+						save(seg,key,id);
+					else
+					{
+						while (stats.atomic.threads.load() >= THREADS) //This will not be exact if multiple files are processed at the same time, a few more threads will be run than the limit. Use CMP_EXCHANGE. Worse case this causes overthrottling.
+							std::this_thread::sleep_for(std::chrono::milliseconds(10)); // SHOULD be the time it takes for one block to be encoded.
+
+						stats.atomic.threads++;
+						local_threads++;
+
+						std::thread(save, seg,key,id).detach();
+					}
+				}
+				else
+				{ 
+					ids.push_back(id);
+
+					group.push_back(std::make_pair(key, seg));
+
+					if (group.size() == GROUP)
+						push_group();
+				}
 			}
 
-			//Flush Group:
-			//
+			if (GROUP != 1 && ids.size())
+			{
+				//Flush Group:
+				//
 
-			push_group();
+				push_group();
+			}
 
 
 			auto file_hash = hash_state.Finish();

@@ -12,6 +12,7 @@
 
 #include "volstore/simple.hpp"
 #include "volstore/image.hpp"
+#include "volstore/api.hpp"
 
 #include "d8u/util.hpp"
 #include "d8u/compare.hpp"
@@ -24,6 +25,57 @@ using namespace d8u;
 #include "volrng/volume.hpp"
 #include "volrng/compat.hpp"
 
+
+TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
+{
+	constexpr auto itr_count = 1;
+	constexpr auto folder_size = util::_mb(100);
+
+	std::filesystem::remove_all("tempdisk");
+	std::filesystem::remove_all("resdisk.img");
+	std::filesystem::remove_all("testsnap");
+	std::filesystem::remove_all("teststore");
+
+	std::filesystem::create_directories("tempdisk");
+	std::filesystem::create_directories("testsnap");
+	std::filesystem::create_directories("teststore");
+
+	{
+		volrng::volume::Test<volrng::DISK> handle("tempdisk");
+		volstore::api::StorageService service("teststore", 1);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+		volstore::BinaryStoreClient store;
+
+		for (size_t i = 0; i < itr_count; i++)
+		{
+			handle.Run(folder_size, volrng::MOUNT);
+
+			handle.Mount(volrng::MOUNT);
+
+			auto result = backup::vss_folder("", "testsnap", volrng::MOUNT, store,
+				[](auto&, auto, auto) { return true; },
+				util::default_domain, 64, util::_mb(1), 64, 5, 64, util::_mb(64));
+
+			handle.Dismount();
+
+			{
+				volrng::DISK res_disk("resdisk.img", util::_gb(100), volrng::MOUNT2);
+
+				restore::folder(volrng::MOUNT2, result.key, store, util::default_domain, true, true, util::_mb(1), util::_mb(64), 64, 64);
+				CHECK(handle.Validate(volrng::MOUNT2));
+			}
+
+			std::filesystem::remove_all("resdisk.img");
+		}
+	}
+
+	std::filesystem::remove_all("resdisk.img");
+	std::filesystem::remove_all("tempdisk");
+	std::filesystem::remove_all("testsnap");
+	std::filesystem::remove_all("teststore");
+}
 
 TEST_CASE("File Exclusion", "[dircopy::backup]")
 {
@@ -82,9 +134,10 @@ TEST_CASE("Path Exclusion", "[dircopy::backup]")
 	std::filesystem::remove_all("delta");
 }
 
-TEST_CASE("Comprehensive folder structure", "[dircopy::backup/restore]")
+TEST_CASE("Comprehensive folder structure (Image)", "[dircopy::backup/restore]")
 {
 	constexpr auto itr_count = 3;
+	constexpr auto folder_size = util::_mb(100);
 
 	std::filesystem::remove_all("tempdisk");
 	std::filesystem::remove_all("resdisk.img");
@@ -101,7 +154,7 @@ TEST_CASE("Comprehensive folder structure", "[dircopy::backup/restore]")
 
 		for (size_t i = 0; i < itr_count; i++)
 		{
-			handle.Run(util::_mb(100), volrng::MOUNT);
+			handle.Run(folder_size, volrng::MOUNT);
 
 			handle.Mount(volrng::MOUNT);
 
