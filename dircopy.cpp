@@ -473,7 +473,7 @@ int main(int argc, char* argv[])
 
     pstats->Print();
 
-    std::cout << "Key: " << pk << std::endl << std::endl;
+    if(pk.size()) std::cout << std::endl << std::endl << "Key: " << pk << std::endl << std::endl;
 
     std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
 
