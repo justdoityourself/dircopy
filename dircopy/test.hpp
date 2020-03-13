@@ -28,13 +28,14 @@ using namespace d8u;
 
 TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 {
-	constexpr auto itr_count = 1;
-	constexpr auto folder_size = util::_mb(100);
+	constexpr auto itr_count = 3;
+	constexpr auto folder_size = util::_mb(300);
 
 	volrng::DISK::Dismount("tempdisk\\disk.img");
 	volrng::DISK::Dismount("resdisk.img");
 
 	std::filesystem::remove_all("tempdisk");
+	std::filesystem::remove_all("127.0.0.1.cache");
 	std::filesystem::remove_all("resdisk.img");
 	std::filesystem::remove_all("testsnap");
 	std::filesystem::remove_all("teststore");
