@@ -117,7 +117,7 @@ namespace dircopy
 						}, key ).detach();
 					}
 
-					slow_wait(local);
+					fast_wait(local);
 				}
 
 				return result;
@@ -146,8 +146,6 @@ namespace dircopy
 		{
 			try
 			{
-				std::atomic<size_t> files = 0;
-
 				auto folder_id = folder_key.Next();
 				auto folder_record = store.Read(folder_id);
 
@@ -173,7 +171,7 @@ namespace dircopy
 
 				auto file = [&](uint64_t p)
 				{
-					dec_scope lock(files);
+					dec_scope lock(s.atomic.files);
 
 					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
 
@@ -217,16 +215,16 @@ namespace dircopy
 				{
 					db.Iterate([&](uint64_t p)
 					{
-						fast_wait(files, F);
+						fast_wait(s.atomic.files, F);
 							
-						files++;
+						s.atomic.files++;
 
 						std::thread(file, p).detach();
 
 						return res;
 					});
 
-					slow_wait(files);
+					fast_wait(s.atomic.files);
 				}
 
 				return res;

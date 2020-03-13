@@ -150,6 +150,7 @@ int main(int argc, char* argv[])
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
     size_t threads = 8;
     size_t files = 4;
+    size_t net_buffer = 16 * 1024 * 1024;
     bool validate = false;
 
     size_t compression = 5;
@@ -167,6 +168,7 @@ int main(int argc, char* argv[])
         option("-d", "--destination").doc("Path to backup") & value("destination", dest),
         option("-o", "--domain").doc("Block identification salt") & value("domain", sdomain),
         option("-t", "--threads").doc("Threads used to encode / decode") & value("threads", threads),
+        option("-nb", "--netbuffer").doc("Size of the TCP socket buffer") & value("network buffer", net_buffer),
         option("-b", "--blockgroup").doc("Group size of identification query") & value("block_grouping", block_grouping),
         option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
@@ -181,6 +183,7 @@ int main(int argc, char* argv[])
     d8u::util::Statistics _stats;
     d8u::util::Statistics* pstats = &_stats;
     StorageService* pservice = nullptr;
+    volstore::BinaryStoreClient* pclient = nullptr;
     std::string current_file,pk;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -192,9 +195,15 @@ int main(int argc, char* argv[])
             pstats->Print();
 
             if(pservice)
-                std::cout << " C: " << pservice->ConnectionCount() << "\r" << std::flush;
+                std::cout << "[ C: " << pservice->ConnectionCount() 
+                << " M: " << pservice->MessageCount() 
+                << " S: " << pservice->EventsStarted() 
+                << " F: " << pservice->EventsFinished() 
+                << " R: " << pservice->ReplyCount()  << " ]\r" << std::flush;
+            else if(pclient)
+                std::cout << "[ W: " << pclient->Writes() << " R: " << pclient->Reads() << " ] " << current_file << "\t\t\r" << std::flush;
             else
-                std::cout << " " << current_file << "\t\t\r" << std::flush;
+                std::cout << current_file << "\t\t\r" << std::flush;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
@@ -228,6 +237,7 @@ int main(int argc, char* argv[])
                 case switch_t("threads"):   threads = value;    break;
                 case switch_t("snapshot"):      snapshot = value;       break;
                 case switch_t("validate"):      validate = value;       break;
+                case switch_t("netbuffer"):     net_buffer = value;     break;
                 case switch_t("recursive"):     recursive = value;      break;
                 case switch_t("blockgroup"):    block_grouping = value; break;
                 case switch_t("destination"):   dest = value;           break;
@@ -453,7 +463,32 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", host + ":9009", host + ":1010", host + ":1111");
+                    std::string query, read, write;
+
+                    switch (switch_t(action))
+                    {
+                    default:
+                    case switch_t("delta"):
+                        break;
+                    case switch_t("backup"):
+                        query = host + ":9009";
+                        write = host + ":1111";
+                        break;
+                    case switch_t("fetch"):
+                    case switch_t("enumerate"):
+                    case switch_t("search"):
+                    case switch_t("validate_deep"):
+                    case switch_t("restore"):
+                        read = host + ":1010";
+                        break;
+                    case switch_t("validate"):
+                        query = host + ":9009";
+                        read = host + ":1010";
+                        break;
+                    }
+
+                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer);
+                    pclient = &store;
                     do_switch(store);
                 }
             }

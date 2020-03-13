@@ -125,6 +125,8 @@ namespace dircopy
 						s.atomic.write += e.size();
 
 						output.write((char*)e.data(), e.size());
+
+						e.clear();
 					}
 				});
 
@@ -168,8 +170,6 @@ namespace dircopy
 
 		template <typename S, typename D> void folder2(Statistics & s,std::string_view dest, const DefaultHash& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
-			std::atomic<size_t> files = 0;
-
 			auto folder_record = block(s, folder_key, store, domain, validate_blocks);
 
 			auto database = restore::file_memory(s, gsl::span<DefaultHash>((DefaultHash*)folder_record.data(), folder_record.size() / sizeof(DefaultHash)), store, domain, validate_blocks, hash_file);
@@ -186,7 +186,7 @@ namespace dircopy
 
 			auto file = [&](uint64_t p)
 			{
-				dec_scope lock(files);
+				dec_scope lock(s.atomic.files);
 
 				auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
 
@@ -226,16 +226,16 @@ namespace dircopy
 			{
 				db.Iterate([&](uint64_t p)
 				{
-					fast_wait(files,F);
+					fast_wait(s.atomic.files,F);
 
-					files++;
+					s.atomic.files++;
 
 					std::thread(file, p).detach();
 
 					return true;
 				});
 
-				slow_wait(files);
+				fast_wait(s.atomic.files);
 			}
 		}
 
