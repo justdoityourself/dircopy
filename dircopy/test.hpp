@@ -28,7 +28,7 @@ using namespace d8u;
 
 TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 {
-	constexpr auto itr_count = 3;
+	constexpr auto itr_count = 1;
 	constexpr auto folder_size = util::_mb(300);
 
 	volrng::DISK::Dismount("tempdisk\\disk.img");
@@ -100,7 +100,7 @@ TEST_CASE("Comprehensive folder structure (Net)", "[dircopy::backup/restore]")
 
 TEST_CASE("Comprehensive folder structure (Image)", "[dircopy::backup/restore]")
 {
-	constexpr auto itr_count = 3;
+	constexpr auto itr_count = 1;
 	constexpr auto folder_size = util::_mb(300);
 
 	volrng::DISK::Dismount("tempdisk\\disk.img");
@@ -200,7 +200,7 @@ TEST_CASE("Folder", "[dircopy::backup/restore]")
 	std::filesystem::remove_all("altdelta");
 }
 
-TEST_CASE("File Exclusion", "[dircopy::backup]")
+TEST_CASE("Exclusion", "[dircopy::backup]")
 {
 	std::filesystem::remove_all("delta");
 	std::filesystem::remove_all("teststore");
@@ -210,39 +210,16 @@ TEST_CASE("File Exclusion", "[dircopy::backup]")
     {
         "file": 
 		{ 
-			"testdata\large_compress":true,
-			"testdata\empty":true,
-			"testdata\small_compress":true,
-			"testdata\tiny_compress":true,
-			"testdata\tiny_nocompress":true,
-			"testdata\medium_nocompress":true,
+			"\large_compress":true,
+			"\empty":true,
+			"\small_compress":true,
+			"\tiny_compress":true,
+			"\tiny_nocompress":true,
+			"\medium_nocompress":true,
 		},
-		"path":{}
-    })";
-
-	volstore::Simple store("teststore");
-
-	auto result = backup::recursive_folder(exclude, "delta", "testdata", store,
-		[](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
-
-	CHECK(1024 * 1024 /*Database Block*/ == result.stats.read);
-
-	std::filesystem::remove_all("teststore");
-	std::filesystem::remove_all("delta");
-}
-
-TEST_CASE("Path Exclusion", "[dircopy::backup]")
-{
-	std::filesystem::remove_all("delta");
-	std::filesystem::remove_all("teststore");
-	std::filesystem::create_directories("teststore");
-
-	std::string_view exclude = R"(
-    {
-        "file": { },
 		"path":
 		{
-			"testdata":true
+			"\\testpath":true
 		}
     })";
 
@@ -251,7 +228,7 @@ TEST_CASE("Path Exclusion", "[dircopy::backup]")
 	auto result = backup::recursive_folder(exclude, "delta", "testdata", store,
 		[](auto&, auto, auto) { return true; }, util::default_domain, 5, 1024 * 1024, 8, 5, 8, 64 * 1024 * 1024);
 
-	CHECK(1024*1024 /*Database Block*/ == result.stats.read);
+	CHECK(1024 * 1024 /*Database Block*/ == result.stats.read);
 
 	std::filesystem::remove_all("teststore");
 	std::filesystem::remove_all("delta");
@@ -274,8 +251,8 @@ TEST_CASE("Mount", "[dircopy::backup/restore]")
 
 	CHECK(1 == handle.Search("ge_com", [](auto s, auto t, auto n, auto k) {return true; }));
 	CHECK(1 == handle.Search("medium", [](auto s, auto t, auto n, auto k) {return true; }));
-	CHECK(2 == handle.Search("tiny", [](auto s, auto t, auto n, auto k) {return true; }));
-	CHECK(5 == handle.Search("compress", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(3 == handle.Search("tiny", [](auto s, auto t, auto n, auto k) {return true; }));
+	CHECK(6 == handle.Search("compress", [](auto s, auto t, auto n, auto k) {return true; }));
 	CHECK(2 == handle.Search("nocompress", [](auto s, auto t, auto n, auto k) {return true; }));
 
 	size_t count = 0;
@@ -286,7 +263,7 @@ TEST_CASE("Mount", "[dircopy::backup/restore]")
 		return true;
 	});
 
-	CHECK(6 + 1 /*Stats*/ == count);
+	CHECK(8 + 1 /*Stats*/ == count);
 
 	std::filesystem::remove_all("mount");
 	std::filesystem::remove_all("delta");

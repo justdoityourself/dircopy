@@ -394,28 +394,9 @@ namespace dircopy
 				stats.atomic.items++;
 
 				uint64_t change_time = GetFileWriteTime(e);
-				auto rel = e.path().string();//auto rel = std::filesystem::absolute(e.path()).string();
-				auto full = rel;
+				auto full = e.path().string();
+				auto rel = full.substr(path.size());
 
-				if (rel_count)
-				{
-					//When using a snapshot or mountpoint, correct the path:
-					//
-
-					for (int c = 0, i = 0; i < rel.size(); i++)
-					{
-						if (rel[i] == '/' || rel[i] == '\\')
-						{
-							c++;
-
-							if (rel_count == c)
-							{
-								rel = std::string(drive) + rel.substr(i+1);
-								break;
-							}
-						}
-					}
-				}
 
 				uint64_t size = e.file_size();
 
