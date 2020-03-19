@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
 
 #include "d8u/string_switch.hpp"
 #include "d8u/util.hpp"
+#include "d8u/string.hpp"
 #include "d8u/transform.hpp"
 #include "d8u/json.hpp"
 
