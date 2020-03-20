@@ -1,3 +1,7 @@
+# Showcase
+
+[![dircopy](http://img.youtube.com/vi/0wukglcP3SM/0.jpg)](https://www.youtube.com/watch?v=0wukglcP3SM "dircopy")
+
 # dircopy
 
     -i cli/image -a backup -p testdata -s cli/snap
