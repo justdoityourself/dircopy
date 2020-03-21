@@ -7,6 +7,7 @@
 
 #include "d8u/transform.hpp"
 #include "defs.hpp"
+#include "delta.hpp"
 
 #include "d8u/util.hpp"
 #include "../mio.hpp"
@@ -174,7 +175,7 @@ namespace dircopy
 
 			auto database = restore::file_memory(s, gsl::span<DefaultHash>((DefaultHash*)folder_record.data(), folder_record.size() / sizeof(DefaultHash)), store, domain, validate_blocks, hash_file);
 
-			tdb::MemoryHashmap db(database);
+			typename tdb::MemoryHashmap db(database);
 
 			{
 				auto [size, time, name, data] = delta::Path::DecodeRaw(db.FindObject(domain));

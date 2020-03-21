@@ -43,10 +43,13 @@ int main(int argc, char* argv[])
 #include "d8u/string.hpp"
 #include "d8u/transform.hpp"
 #include "d8u/json.hpp"
+#include "d8u/compare.hpp"
 
 #include "dircopy/backup.hpp"
 #include "dircopy/validate.hpp"
 #include "dircopy/mount.hpp"
+
+#include "blocksync/sync.hpp"
 
 using std::string;
 using namespace clipp;
@@ -161,7 +164,7 @@ int main(int argc, char* argv[])
     auto cli = (
         option("-c", "--config").doc("Json configuration file") & value("json", json),
         option("-k", "--key").doc("The store key used to restore, mount or validate") & value("key", skey),
-        option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate") & value("action", action),
+        option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate, compare, sync, migrate") & value("action", action),
         option("-s", "--snapshot").doc("A path where snapshot databases are stored") & value("snapshot", snapshot),
         option("-i", "--image").doc("Path of the image: D:\\Backup") & value("image", image),
         option("-h", "--host").doc("Hostname or IP of  store: backup.com, 192.168.4.14") & value("host", host),
@@ -258,6 +261,29 @@ int main(int argc, char* argv[])
                 else
                     _stats.direct.target = backup::single_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true;  });
             }
+
+            if (sdomain.size())
+                domain = d8u::util::to_bin(sdomain);
+            else
+            {
+                domain.resize(d8u::util::default_domain.size());
+                std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
+            }
+
+            if (skey.size())
+            {
+                auto vkey = d8u::util::to_bin(skey);
+                if (vkey.size() != 32)
+                    throw std::runtime_error("Bad input key");
+
+                std::copy(vkey.begin(), vkey.end(), key.begin());
+            }
+
+            if (snapshot.size())
+                std::filesystem::create_directories(snapshot);
+
+            if (image.size())
+                std::filesystem::create_directories(image);
 
             d8u::transform::DefaultHash result;
 
@@ -422,6 +448,44 @@ int main(int argc, char* argv[])
                 }
             };
 
+            bool simple_command = false;
+
+            switch (switch_t(action))
+            {
+            case switch_t("compare"):
+
+                std::cout << "Compare: " << path << " " << host << std::endl << std::endl;
+
+                if(d8u::compare::folders(path,host,files))
+                    std::cout << "Match!" << std::endl;
+                else
+                    std::cout << "DIFFERENT" << std::endl;
+
+                simple_command = true;
+                break;
+            case switch_t("sync"):
+            {
+                std::cout << "Sync: " << image << " " << host << std::endl << std::endl;
+
+                blocksync::Sync<volstore::Image, volstore::Image> sync_handle(snapshot, image, host);
+
+                sync_handle.Push(_stats, validate, threads);
+
+                simple_command = true;
+            }   break;
+            case switch_t("migrate"):
+            {
+                std::cout << "Migrate: " << image << " " << skey << " " << host << std::endl << std::endl;
+
+                blocksync::Sync<volstore::Image, volstore::Image> sync_handle(snapshot, image, host);
+
+                sync_handle.MigrateFolder(_stats, key, domain,validate, files,threads);
+
+                simple_command = true;
+            }   break;
+            default: break;
+            }
+
             if (storage_server)
             {
                 StorageService service(path, threads);
@@ -431,32 +495,8 @@ int main(int argc, char* argv[])
 
                 service.Join();
             }
-            else
+            else if(!simple_command)
             {
-                if (sdomain.size())
-                    domain = d8u::util::to_bin(sdomain);
-                else
-                {
-                    domain.resize(d8u::util::default_domain.size());
-                    std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
-                }
-
-                if (skey.size())
-                {
-                    auto vkey = d8u::util::to_bin(skey);
-                    if (vkey.size() != 32)
-                        throw std::runtime_error("Bad input key");
-
-                    std::copy(vkey.begin(), vkey.end(), key.begin());
-                }
-
-
-                if (snapshot.size())
-                    std::filesystem::create_directories(snapshot);
-
-                if (image.size())
-                    std::filesystem::create_directories(image);
-
                 if (image.size())
                 {
                     volstore::Image store(image);

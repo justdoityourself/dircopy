@@ -12,3 +12,4 @@ tempdisk/*
 store/*
 testsnap/*
 backup_small.json
+restore.json
