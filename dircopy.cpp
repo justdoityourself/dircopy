@@ -467,7 +467,7 @@ int main(int argc, char* argv[])
             {
                 std::cout << "Sync: " << image << " " << host << std::endl << std::endl;
 
-                blocksync::Sync<volstore::Image, volstore::Image> sync_handle(snapshot, image, host);
+                blocksync::Sync<volstore::Image, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
 
                 sync_handle.Push(_stats, validate, threads);
 
@@ -477,7 +477,7 @@ int main(int argc, char* argv[])
             {
                 std::cout << "Migrate: " << image << " " << skey << " " << host << std::endl << std::endl;
 
-                blocksync::Sync<volstore::Image, volstore::Image> sync_handle(snapshot, image, host);
+                blocksync::Sync<volstore::Image, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
 
                 sync_handle.MigrateFolder(_stats, key, domain,validate, files,threads);
 
