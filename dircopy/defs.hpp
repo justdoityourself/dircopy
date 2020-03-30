@@ -3,12 +3,14 @@
 #pragma once
 
 #include "d8u/transform.hpp"
+#include "d8u/util.hpp"
 
 namespace dircopy
 {
 	namespace defs
 	{
 		using namespace d8u::transform;
+		using namespace d8u::util;
 
 #pragma pack( push, 1 )
 
@@ -34,6 +36,18 @@ namespace dircopy
 			uint8_t disk_type;
 			uint8_t fs;
 			uint16_t desc_len;
+		};
+
+		struct KeyResult
+		{
+			DefaultHash key;
+			Direct stats;
+		};
+
+		struct BlockResult
+		{
+			std::vector<uint8_t> key_list;
+			Direct stats;
 		};
 
 #pragma pack(pop)

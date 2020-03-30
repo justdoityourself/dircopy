@@ -38,18 +38,6 @@ namespace dircopy
 		using namespace defs;
 		using namespace d8u::util;
 
-		struct KeyResult
-		{
-			DefaultHash key;
-			Direct stats;
-		};
-
-		struct BlockResult
-		{
-			std::vector<uint8_t> key_list;
-			Direct stats;
-		};
-
 		template < typename STORE, typename D > DefaultHash block(Statistics& stats, std::vector<uint8_t>& buffer, STORE& store, const D& domain = default_domain, int compression = 5)
 		{
 			stats.atomic.read += buffer.size(); stats.atomic.blocks++;
