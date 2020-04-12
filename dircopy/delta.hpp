@@ -7,7 +7,7 @@
 #include "d8u/transform.hpp"
 #include "d8u/util.hpp"
 #include "d8u/json.hpp"
-#include "tdb/database.hpp"
+#include "tdb/legacy.hpp"
 
 namespace dircopy
 {

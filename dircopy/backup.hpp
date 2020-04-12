@@ -60,7 +60,29 @@ namespace dircopy
 			return key;
 		}
 
-		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, STORE& store, const D& domain = default_domain, int compression = 5)
+		template < typename STORE, typename D > DefaultHash block_span(Statistics& stats, gsl::span<uint8_t> span, STORE& store, const D& domain = default_domain, int compression = 5)
+		{
+			stats.atomic.read += span.size(); stats.atomic.blocks++;
+
+			DefaultHash key, id;
+			std::tie(key, id) = identify(domain, span);
+
+			if (store.Is(id))
+			{
+				stats.atomic.duplicate += span.size();
+				stats.atomic.dblocks++;
+				return key;
+			}
+
+			auto [_key,buffer] = encode2_span(span, key, id, compression);
+
+			store.Write(id, buffer);
+			stats.atomic.write += buffer.size();
+
+			return key;
+		}
+
+		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, STORE& store, const D& domain = default_domain, int compression = 5, std::atomic<size_t>* plocal = nullptr)
 		{
 			if (MAX == 0)
 			{
@@ -73,11 +95,35 @@ namespace dircopy
 
 			stats.atomic.threads++;
 
-			std::thread([&](std::vector<uint8_t> buffer)
+			std::thread([&domain = domain, &store = store, &out = out, &stats = stats, plocal](std::vector<uint8_t> buffer)
 			{
 				out = block(stats, buffer, store, domain, compression);
 				stats.atomic.threads--;
+
+				if (plocal) *plocal++;
 			}, std::move(buffer)).detach();
+		}
+
+		template < typename STORE, typename D > void async_block_span(size_t MAX, DefaultHash& out, Statistics& stats, gsl::span<uint8_t> buffer, STORE& store, const D& domain = default_domain, int c = 5, std::atomic<size_t>* plocal = nullptr)
+		{
+			if (MAX == 0)
+			{
+				out = block_span(stats, buffer, store, domain, c);
+				return;
+			}
+
+			while (stats.atomic.threads.load() >= MAX)
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+			stats.atomic.threads++;
+
+			std::thread([buffer,c,&domain = domain, &store = store, &out = out, &stats = stats, plocal]() mutable
+			{
+				out = block_span(stats, buffer, store, domain, c);
+				stats.atomic.threads--;
+
+				if (plocal) *plocal++;
+			}).detach();
 		}
 
 		template < typename MAP, typename STORE, typename D > std::vector<uint8_t> core_file(Statistics& stats, const MAP& file, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
