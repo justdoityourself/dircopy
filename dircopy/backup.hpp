@@ -60,7 +60,7 @@ namespace dircopy
 			return key;
 		}
 
-		template < typename STORE, typename D > DefaultHash block_span(Statistics& stats, gsl::span<uint8_t> span, STORE& store, const D& domain = default_domain, int compression = 5)
+		/*template < typename STORE, typename D > DefaultHash block_span(Statistics& stats, gsl::span<uint8_t> span, STORE& store, const D& domain = default_domain, int compression = 5)
 		{
 			stats.atomic.read += span.size(); stats.atomic.blocks++;
 
@@ -80,13 +80,13 @@ namespace dircopy
 			stats.atomic.write += buffer.size();
 
 			return key;
-		}
+		}*/
 
-		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, STORE& store, const D& domain = default_domain, int compression = 5, std::atomic<size_t>* plocal = nullptr)
+		template < typename STORE, typename D > void async_block(size_t MAX, DefaultHash& out, Statistics& stats, std::vector<uint8_t> buffer, STORE& store, const D& domain = default_domain, int c = 5, std::atomic<size_t>* plocal = nullptr)
 		{
 			if (MAX == 0)
 			{
-				out = block(stats, buffer, store, domain, compression);
+				out = block(stats, buffer, store, domain, c);
 				return;
 			}
 
@@ -95,16 +95,16 @@ namespace dircopy
 
 			stats.atomic.threads++;
 
-			std::thread([&domain = domain, &store = store, &out = out, &stats = stats, plocal](std::vector<uint8_t> buffer)
+			std::thread([c,&domain = domain, &store = store, &out = out, &stats = stats, plocal](std::vector<uint8_t> buffer) mutable
 			{
-				out = block(stats, buffer, store, domain, compression);
+				out = block(stats, buffer, store, domain, c);
 				stats.atomic.threads--;
 
-				if (plocal) *plocal++;
+				if (plocal) (*plocal)+=1;
 			}, std::move(buffer)).detach();
 		}
 
-		template < typename STORE, typename D > void async_block_span(size_t MAX, DefaultHash& out, Statistics& stats, gsl::span<uint8_t> buffer, STORE& store, const D& domain = default_domain, int c = 5, std::atomic<size_t>* plocal = nullptr)
+		/*template < typename STORE, typename D > void async_block_span(size_t MAX, DefaultHash& out, Statistics& stats, gsl::span<uint8_t> buffer, STORE& store, const D& domain = default_domain, int c = 5, std::atomic<size_t>* plocal = nullptr)
 		{
 			if (MAX == 0)
 			{
@@ -124,7 +124,7 @@ namespace dircopy
 
 				if (plocal) *plocal++;
 			}).detach();
-		}
+		}*/
 
 		template < typename MAP, typename STORE, typename D > std::vector<uint8_t> core_file(Statistics& stats, const MAP& file, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
