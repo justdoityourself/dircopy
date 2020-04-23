@@ -311,7 +311,7 @@ namespace dircopy
 			//Write unique block:
 			//
 
-			encode2(result, key, id);
+			encode2(result, key, id,compression);
 
 			store.Write(id, result); //Files larger than 32 GB exceed 1MB of metadata, breaking the unenforced limit.
 
