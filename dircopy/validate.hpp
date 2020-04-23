@@ -9,7 +9,7 @@
 
 #include "d8u/util.hpp"
 
-#include "tdb/database.hpp"
+#include "tdb/legacy.hpp"
 
 namespace dircopy
 {
