@@ -271,13 +271,7 @@ int main(int argc, char* argv[])
             }
 
             if (skey.size())
-            {
-                auto vkey = d8u::util::to_bin(skey);
-                if (vkey.size() != 32)
-                    throw std::runtime_error("Bad input key");
-
-                std::copy(vkey.begin(), vkey.end(), key.begin());
-            }
+                key = d8u::util:to_bin_t<DefaultHash>(skey);
 
             if (snapshot.size())
                 std::filesystem::create_directories(snapshot);
