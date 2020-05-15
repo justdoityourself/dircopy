@@ -23,8 +23,7 @@ namespace dircopy
 
 		struct VolumeHeader
 		{
-			DefaultHash file;
-			DefaultHash meta;
+			DefaultHash key;
 			uint32_t disk;
 			uint32_t part;
 			uint64_t start;
