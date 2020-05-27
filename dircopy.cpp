@@ -146,6 +146,11 @@ using namespace volstore::api;
         Finished in: 1.02594s
 */
 
+//TODO configure ports
+//TODO A store B store switching
+//TODO METADATA LEVEL
+
+
 int main(int argc, char* argv[])
 {
     d8u::transform::DefaultHash key;
@@ -271,7 +276,7 @@ int main(int argc, char* argv[])
             }
 
             if (skey.size())
-                key = d8u::util:to_bin_t<DefaultHash>(skey);
+                key = d8u::util::to_bin_t<d8u::transform::DefaultHash>(skey);
 
             if (snapshot.size())
                 std::filesystem::create_directories(snapshot);
@@ -482,7 +487,7 @@ int main(int argc, char* argv[])
 
             if (storage_server)
             {
-                StorageService service(path, threads);
+                StorageService service(path, threads,true);
                 pservice = &service;
 
                 pstats = service.Stats();
