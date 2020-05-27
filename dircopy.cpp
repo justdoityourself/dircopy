@@ -146,7 +146,7 @@ using namespace volstore::api;
         Finished in: 1.02594s
 */
 
-//TODO configure ports
+
 //TODO A store B store switching
 //TODO METADATA LEVEL
 
@@ -157,6 +157,7 @@ int main(int argc, char* argv[])
 
     bool vss = false, recursive = true, storage_server = false, scope = false;
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
+    string hport = "8008", qport="9009", rport="1010", wport="1111";
     size_t threads = 8;
     size_t files = 4;
     size_t net_buffer = 16 * 1024 * 1024;
@@ -179,13 +180,17 @@ int main(int argc, char* argv[])
         option("-t", "--threads").doc("Threads used to encode / decode") & value("threads", threads),
         option("-nb", "--netbuffer").doc("Size of the TCP socket buffer") & value("network buffer", net_buffer),
         option("-b", "--blockgroup").doc("Group size of identification query") & value("block_grouping", block_grouping),
-        option("-m", "--compression").doc("Compression Level ( 0 - 9 )") & value("compression", compression),
+        option("-m", "--compression").doc("Compression Level ( 0 - 19 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
         option("-p", "--scope").doc("Use vss snapshot").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
-        option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive)
+        option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive),
+        option("-ph", "--httpport").doc("HTTP Port") & value("hport", hport),
+        option("-pq", "--queryport").doc("Query Port") & value("qport", qport),
+        option("-pr", "--readport").doc("Read Port") & value("rport", rport),
+        option("-pw", "--writeport").doc("Write Port") & value("wport", wport)
         );
 
     bool running = true;
@@ -487,7 +492,7 @@ int main(int argc, char* argv[])
 
             if (storage_server)
             {
-                StorageService service(path, threads,true);
+                StorageService service(path, threads,true,hport,qport,rport,wport);
                 pservice = &service;
 
                 pstats = service.Stats();
@@ -511,19 +516,19 @@ int main(int argc, char* argv[])
                     case switch_t("delta"):
                         break;
                     case switch_t("backup"):
-                        query = host + ":9009";
-                        write = host + ":1111";
+                        query = host + ":" + qport;
+                        write = host + ":" + wport;
                         break;
                     case switch_t("fetch"):
                     case switch_t("enumerate"):
                     case switch_t("search"):
                     case switch_t("validate_deep"):
                     case switch_t("restore"):
-                        read = host + ":1010";
+                        read = host + ":" + rport;
                         break;
                     case switch_t("validate"):
-                        query = host + ":9009";
-                        read = host + ":1010";
+                        query = host + ":" + qport;
+                        read = host + ":1" + rport;
                         break;
                     }
 
