@@ -158,12 +158,12 @@ int main(int argc, char* argv[])
     bool vss = false, recursive = true, storage_server = false, scope = false;
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
     string hport = "8008", qport="9009", rport="1010", wport="1111";
-    size_t threads = 8;
-    size_t files = 4;
+    size_t threads = 4;
+    size_t files = 64;
     size_t net_buffer = 16 * 1024 * 1024;
     bool validate = false;
 
-    size_t compression = 5;
+    size_t compression = 13;
     size_t block_grouping = 16;
     std::vector<uint8_t> domain;
 
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
         option("-m", "--compression").doc("Compression Level ( 0 - 19 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
         option("-v", "--vss").doc("Use vss snapshot").set(vss),
-        option("-p", "--scope").doc("Use vss snapshot").set(scope),
+        option("-sc", "--scope").doc("Calculate Folder Size to enable progress").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive),

@@ -379,7 +379,18 @@ namespace dircopy
 					continue;
 
 				uint64_t change_time = GetFileWriteTime(e);
-				auto rel = e.path().string();
+
+				std::string rel;
+				try
+				{
+					rel = e.path().string();
+				}
+				catch (...)
+				{
+					std::cout << "Skiping file with unicode characters in name..." << std::endl;
+					continue;
+				}
+				
 				auto full = rel;
 
 				if (rel_count)
@@ -428,9 +439,20 @@ namespace dircopy
 				stats.atomic.items++;
 
 				uint64_t change_time = GetFileWriteTime(e);
-				auto full = e.path().string();
-				auto rel = full.substr(path.size());
 
+				std::string full;
+
+				try
+				{
+					full = e.path().string();
+				}
+				catch (...)
+				{
+					std::cout << "Skiping file with unicode characters in name..." << std::endl;
+					continue;
+				}
+
+				auto rel = full.substr(path.size());
 
 				uint64_t size = e.file_size();
 
