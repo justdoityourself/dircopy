@@ -459,7 +459,7 @@ namespace dircopy
 				auto queue = db.Queue(rel, size, change_time, BLOCK, LARGE_THRESHOLD);
 
 				if (!queue) //Excluded
-					return;
+					continue;
 
 				if (!db.Changed(rel, size, change_time, queue))
 				{
