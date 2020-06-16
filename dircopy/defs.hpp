@@ -19,11 +19,13 @@ namespace dircopy
 			uint64_t size;
 			DefaultHash block_zero;
 			DefaultHash block_n;
+			Audit audit;
 		};
 
 		struct VolumeHeader
 		{
 			DefaultHash key;
+			Audit audit;
 			uint32_t disk;
 			uint32_t part;
 			uint64_t start;
