@@ -157,6 +157,9 @@ namespace dircopy
 
 				if (store.Is(id))
 				{
+					if (THREADS != 1)
+						stats.atomic.threads--;
+
 					stats.atomic.duplicate += slice.size();
 					stats.atomic.dblocks++;
 				}
@@ -167,15 +170,16 @@ namespace dircopy
 
 					encode2(buffer, key, id, compression);
 
+					//Allow the next thread to start encoding while we write this buffer
+					if (THREADS != 1)
+						stats.atomic.threads--;
+
 					store.Write(id, buffer);
 					stats.atomic.write += buffer.size();
 				}
 
 				if (THREADS != 1)
-				{
-					stats.atomic.threads--;
 					local_threads--;
-				}
 			};
 
 
@@ -210,6 +214,9 @@ namespace dircopy
 					std::thread(save, seg, dx).detach();
 				}
 			}
+
+			//Streaming IO is complete for this file, allow the next to start
+			stats.atomic.files--;
 
 			//Wait for threads to close before return:
 			//
@@ -583,7 +590,7 @@ namespace dircopy
 
 					if (FILES != 1)
 					{
-						stats.atomic.files--;
+						//stats.atomic.files--; //this now belongs to the file call
 						stats.atomic.memory -= size;
 					}
 				};
@@ -591,15 +598,15 @@ namespace dircopy
 				if (!on_file(rel, size, change_time))
 					break;
 
-				if (FILES == 1)
-					_file(full, rel, size, change_time, queue);
-				else
+				/*if (FILES == 1)
+					_file(full, rel, size, change_time, queue); // All files must now reside inside of a thread as overlapped file encoding can occur even when IO does not.
+				else*/
 				{
 					while (stats.atomic.files.load() >= FILES)
-						std::this_thread::sleep_for(std::chrono::milliseconds(20));
+						std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
 					while (stats.atomic.memory.load() >= MAX_MEMORY)
-						std::this_thread::sleep_for(std::chrono::milliseconds(20));
+						std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
 					stats.atomic.files++;
 					stats.atomic.memory += size;
@@ -608,7 +615,7 @@ namespace dircopy
 				}
 			}
 
-			while (FILES != 1 && stats.atomic.files.load())
+			while (/*FILES != 1 && */stats.atomic.files.load())
 				std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		}
 
