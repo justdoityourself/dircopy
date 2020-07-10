@@ -428,7 +428,7 @@ namespace dircopy
 		{
 			BlockResult stats;
 
-			if (std::filesystem::file_size(name) == 0)
+			if (GetFileSize(name) == 0)
 				return stats;
 
 			mio::mmap_source file(name);
@@ -443,7 +443,7 @@ namespace dircopy
 		{
 			Statistics stats;
 
-			if (std::filesystem::file_size(name) == 0)
+			if (GetFileSize(name) == 0)
 				return { DefaultHash(), stats.direct };
 
 			mio::mmap_source file(name);
@@ -455,7 +455,7 @@ namespace dircopy
 
 		template < typename STORE, typename D > std::vector<uint8_t> single_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
-			if (std::filesystem::file_size(name) == 0)
+			if (GetFileSize(name) == 0)
 				return std::vector<uint8_t>();
 
 			mio::mmap_source file(name);
@@ -466,7 +466,7 @@ namespace dircopy
 
 		template < typename STORE, typename D> DefaultHash submit_file2(Statistics& stats, std::string_view name, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
 		{
-			if (std::filesystem::file_size(name) == 0)
+			if (GetFileSize(name) == 0)
 				return DefaultHash();
 
 			mio::mmap_source file(name);
@@ -492,7 +492,13 @@ namespace dircopy
 				}
 				catch (...)
 				{
-					std::cout << "Skiping file with unicode characters in name..." << std::endl;
+					//Todo store utf8
+					//auto utf8_string = e.path().u8string(); 
+					//rel = std::string(utf8_string.begin(), utf8_string.end());
+
+					//Todo open on win32 with ucs16 u16string
+
+					std::cout << "Skipping file with unicode characters in name... " << std::endl;
 					continue;
 				}
 				
@@ -553,7 +559,7 @@ namespace dircopy
 				}
 				catch (...)
 				{
-					std::cout << "Skiping file with unicode characters in name..." << std::endl;
+					std::cout << "Skipping file with unicode characters in name..." << std::endl;
 					continue;
 				}
 
@@ -595,9 +601,6 @@ namespace dircopy
 					}
 				};
 
-				if (!on_file(rel, size, change_time))
-					break;
-
 				/*if (FILES == 1)
 					_file(full, rel, size, change_time, queue); // All files must now reside inside of a thread as overlapped file encoding can occur even when IO does not.
 				else*/
@@ -607,6 +610,9 @@ namespace dircopy
 
 					while (stats.atomic.memory.load() >= MAX_MEMORY)
 						std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+					if (!on_file(rel, size, change_time))
+						break;
 
 					stats.atomic.files++;
 					stats.atomic.memory += size;

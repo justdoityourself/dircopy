@@ -160,9 +160,9 @@ int main(int argc, char* argv[])
     string hport = "8008", qport="9009", rport="1010", wport="1111";
     size_t threads = 4;
     size_t files = 64;
-    size_t net_buffer = 16 * 1024 * 1024;
-    size_t max_memory = 128 * 1024 * 1024;
-    bool validate = false;
+    size_t net_buffer = 16;
+    size_t max_memory = 128;
+    bool validate = false, auto_clear_bad_state = false;
 
     size_t compression = 13;
     size_t block_grouping = 16;
@@ -188,6 +188,7 @@ int main(int argc, char* argv[])
         option("-sc", "--scope").doc("Calculate Folder Size to enable progress").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
+        option("-ac", "--auto_clear_bad_state").doc("Recover with any errors from previous backup failures.").set(auto_clear_bad_state),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive),
         option("-ph", "--httpport").doc("HTTP Port") & value("hport", hport),
         option("-pq", "--queryport").doc("Query Port") & value("qport", qport),
@@ -268,6 +269,17 @@ int main(int argc, char* argv[])
         {
             if (scope && path.size() && snapshot.size())
             {
+                if (auto_clear_bad_state)
+                {
+                    if (std::filesystem::exists(snapshot + "\\lock.db"))
+                    {
+                        std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
+                        std::filesystem::remove_all(snapshot);
+                    }
+                }
+
+                std::cout << "Computing size of folder ( Enables percent complete, see --scope )" << std::endl;
+
                 if (recursive)
                     _stats.direct.target = backup::recursive_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true; });
                 else
@@ -315,18 +327,27 @@ int main(int argc, char* argv[])
                 switch (switch_t(action))
                 {
                 case switch_t("backup"):
+                    if (auto_clear_bad_state)
+                    {
+                        if (std::filesystem::exists(snapshot + "\\lock.db"))
+                        {
+                            std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
+                            std::filesystem::remove_all(snapshot);
+                        }
+                    }
+
                     if (vss)
                     {
 #ifdef _WIN32
                         if (recursive)
                         {
                             std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,max_memory);
+                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,max_memory * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory);
+                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
                         }
 #else
                         std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -337,12 +358,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory);
+                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory * 1024 * 1024);
                         }
                         else
                         {
                             std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory);
+                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory * 1024 * 1024);
                         }
                     }
 
@@ -534,7 +555,7 @@ int main(int argc, char* argv[])
                         break;
                     }
 
-                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer);
+                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer * 1024 * 1024);
                     pclient = &store;
                     do_switch(store);
                 }
