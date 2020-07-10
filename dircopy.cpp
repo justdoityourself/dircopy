@@ -161,6 +161,7 @@ int main(int argc, char* argv[])
     size_t threads = 4;
     size_t files = 64;
     size_t net_buffer = 16 * 1024 * 1024;
+    size_t max_memory = 128 * 1024 * 1024;
     bool validate = false;
 
     size_t compression = 13;
@@ -179,6 +180,7 @@ int main(int argc, char* argv[])
         option("-o", "--domain").doc("Block identification salt") & value("domain", sdomain),
         option("-t", "--threads").doc("Threads used to encode / decode") & value("threads", threads),
         option("-nb", "--netbuffer").doc("Size of the TCP socket buffer") & value("network buffer", net_buffer),
+        option("-mm", "--maxmemory").doc("Limit memory that can be used as IO buffer") & value("max memory", max_memory),
         option("-b", "--blockgroup").doc("Group size of identification query") & value("block_grouping", block_grouping),
         option("-m", "--compression").doc("Compression Level ( 0 - 19 )") & value("compression", compression),
         option("-f", "--files").doc("Files processed at a time") & value("threads", files),
@@ -319,12 +321,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,max_memory);
                         }
                         else
                         {
                             std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory);
                         }
 #else
                         std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -335,12 +337,12 @@ int main(int argc, char* argv[])
                         if (recursive)
                         {
                             std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory);
                         }
                         else
                         {
                             std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024);
+                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory);
                         }
                     }
 

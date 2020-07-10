@@ -139,6 +139,104 @@ namespace dircopy
 			//
 
 			auto count = file.size() / BLOCK + ((file.size() % BLOCK) ? 1 : 0);
+			result.resize(sizeof(DefaultHash) * (count + 1)); // + File Hash
+
+			gsl::span<DefaultHash> result_keys((DefaultHash*)result.data(), count + 1);
+
+
+			//Store unique block:
+			//
+
+			auto save = [&](auto slice, size_t dx)
+			{
+				//Identify as unique:
+				//
+
+				DefaultHash key, id; std::tie(key, id) = identify(domain, slice);
+				result_keys[dx] = key;
+
+				if (store.Is(id))
+				{
+					stats.atomic.duplicate += slice.size();
+					stats.atomic.dblocks++;
+				}
+				else
+				{
+					std::vector<uint8_t> buffer(slice.size());
+					std::copy(slice.begin(), slice.end(), buffer.begin());
+
+					encode2(buffer, key, id, compression);
+
+					store.Write(id, buffer);
+					stats.atomic.write += buffer.size();
+				}
+
+				if (THREADS != 1)
+				{
+					stats.atomic.threads--;
+					local_threads--;
+				}
+			};
+
+
+			//Map, id and backup one block at a time:
+			//
+
+			for (size_t i = 0,dx=0; i < file.size(); i += BLOCK, dx++)
+			{
+				auto rem = file.size() - i;
+				auto cur = BLOCK;
+
+				if (rem < cur) cur = rem;
+
+
+				//Map data and iterate file hash:
+				//
+
+				span<const uint8_t> seg((const uint8_t*)file.data() + i, cur);
+				stats.atomic.read += cur; stats.atomic.blocks++;
+				hash_state.Update(seg);
+
+				if (THREADS == 1)
+					save(seg,dx);
+				else
+				{
+					while (stats.atomic.threads.load() >= THREADS) //This will not be exact if multiple files are processed at the same time, a few more threads will be run than the limit. Use CMP_EXCHANGE. Worse case this causes overthrottling.
+						std::this_thread::sleep_for(std::chrono::milliseconds(10)); // SHOULD be the time it takes for one block to be encoded.
+
+					stats.atomic.threads++;
+					local_threads++;
+
+					std::thread(save, seg, dx).detach();
+				}
+			}
+
+			//Wait for threads to close before return:
+			//
+
+			while (THREADS != 1 && local_threads.load())
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+			auto file_hash = hash_state.Finish();
+			result_keys[count] = file_hash;
+
+
+			return result;
+		}
+
+		template < typename MAP, typename STORE, typename D > std::vector<uint8_t> _legacy_core_file(Statistics& stats, const MAP& file, STORE& store, const D& domain = default_domain, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1)
+		{
+			std::atomic<int> local_threads = 0;
+
+			HashState hash_state;
+			hash_state.Update(domain); //Protect against content queries.
+
+			std::vector<uint8_t> result;
+
+			//Keep block ids in memory to construct the file handle block:
+			//
+
+			auto count = file.size() / BLOCK + ((file.size() % BLOCK) ? 1 : 0);
 			result.reserve(sizeof(DefaultHash) * (count + 1)); // + File Hash
 
 
@@ -429,7 +527,7 @@ namespace dircopy
 			return total_size;
 		}
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0, size_t MAX_MEMORY = 128*1024*1024)
 		{
 			for (auto& e : DITR(path,std::filesystem::directory_options::skip_permission_denied))
 			{
@@ -484,7 +582,10 @@ namespace dircopy
 					}
 
 					if (FILES != 1)
+					{
 						stats.atomic.files--;
+						stats.atomic.memory -= size;
+					}
 				};
 
 				if (!on_file(rel, size, change_time))
@@ -497,7 +598,11 @@ namespace dircopy
 					while (stats.atomic.files.load() >= FILES)
 						std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
+					while (stats.atomic.memory.load() >= MAX_MEMORY)
+						std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
 					stats.atomic.files++;
+					stats.atomic.memory += size;
 
 					std::thread(_file, full, rel, size, change_time, queue).detach();
 				}
@@ -507,11 +612,11 @@ namespace dircopy
 				std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		}
 
-		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view exclude, std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename DITR, typename STORE, typename ON_FILE, typename D > DefaultHash submit_folder(std::string_view exclude, std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			delta::Path db(delta_folder,exclude);
 
-			core_folder<DITR>(db,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+			core_folder<DITR>(db,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel,MAX_MEMORY);
 
 			db.Statistics(stats,domain);
 
@@ -535,40 +640,40 @@ namespace dircopy
 			return delta_folder< std::filesystem::recursive_directory_iterator >(exclude, snapshot, path, on_file, drive, rel);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view exclude, std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult single_folder(std::string_view exclude, std::string_view delta_folder,std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
-			auto key = submit_folder< std::filesystem::directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+			auto key = submit_folder< std::filesystem::directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel,MAX_MEMORY);
 
 			return { key, stats.direct };
 		}
 
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult recursive_folder(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE &&on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
-			auto key = submit_folder< std::filesystem::recursive_directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+			auto key = submit_folder< std::filesystem::recursive_directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel,MAX_MEMORY);
 
 			return { key, stats.direct };
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash single_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
-			return submit_folder< std::filesystem::directory_iterator>(exclude,delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+			return submit_folder< std::filesystem::directory_iterator>(exclude,delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel,MAX_MEMORY);
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash recursive_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive ="",size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
-			return submit_folder< std::filesystem::recursive_directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel);
+			return submit_folder< std::filesystem::recursive_directory_iterator>(exclude, delta_folder,stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,drive,rel,MAX_MEMORY);
 		}
 
 
 
 #ifdef _WIN32
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_folder2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			std::string full = std::filesystem::absolute(_path).string();
 
@@ -585,23 +690,23 @@ namespace dircopy
 
 			size_t rel = std::count(vss_path.begin(), vss_path.end(), '\\') + std::count(vss_path.begin(), vss_path.end(), '/');
 
-			auto r = recursive_folder2(exclude, delta_folder,stats, vss_path,store,on_file,domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,(use_root) ? drive : "",rel);
+			auto r = recursive_folder2(exclude, delta_folder,stats, vss_path,store,on_file,domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,(use_root) ? drive : "",rel,MAX_MEMORY);
 
 			sn.Dismount();
 
 			return r;
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_folder(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
-			auto r = vss_folder2(exclude, delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD);
+			auto r = vss_folder2(exclude, delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,MAX_MEMORY);
 
 			return { r, stats.direct };
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_single2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > DefaultHash vss_single2(std::string_view exclude, std::string_view delta_folder, Statistics& stats, std::string_view _path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			std::string full = std::filesystem::absolute(_path).string();
 
@@ -618,18 +723,18 @@ namespace dircopy
 
 			size_t rel = std::count(vss_path.begin(), vss_path.end(), '\\') + std::count(vss_path.begin(), vss_path.end(), '/');
 
-			auto r = single_folder2(exclude, delta_folder, stats, vss_path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD, (use_root) ? drive : "", rel);
+			auto r = single_folder2(exclude, delta_folder, stats, vss_path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD, (use_root) ? drive : "", rel,MAX_MEMORY);
 
 			sn.Dismount();
 
 			return r;
 		}
 
-		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_single(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024)
+		template < typename STORE, typename ON_FILE, typename D > KeyResult vss_single(std::string_view exclude, std::string_view delta_folder, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, size_t MAX_MEMORY = 128 * 1024 * 1024)
 		{
 			Statistics stats;
 
-			auto r = vss_single2(exclude, delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD);
+			auto r = vss_single2(exclude, delta_folder, stats, path, store, on_file, domain, FILES, BLOCK, THREADS, compression, GROUP, LARGE_THRESHOLD,MAX_MEMORY);
 
 			return { r, stats.direct };
 		}
