@@ -35,8 +35,10 @@ namespace dircopy
 			{ 
 				if (std::filesystem::exists(string(_root) + "/lock.db"))
 					throw std::runtime_error("Change Tracking database is locked, is a backup running? Did a backup fail to complete gracefully? If the second is true please delete the folder and try again.");
+			}
 
-				d8u::util::empty_file(string(_root) + "/lock.db");
+			~Path()
+			{
 			}
 
 			struct FolderStatistics
@@ -71,6 +73,11 @@ namespace dircopy
 				stream(queue, b_size, "|||Backup Statistics|||", 0, 0, gsl::span<uint8_t>((uint8_t*)&stats,sizeof(FolderStatistics)));
 			}
 
+			void OpenForWriting()
+			{
+				d8u::util::empty_file(string(root) + "/lock.db");
+			}
+
 			std::string Finalize()
 			{
 				change.Close();
@@ -85,8 +92,7 @@ namespace dircopy
 				if(err)
 					throw std::runtime_error(err.message());
 
-				if (!std::filesystem::remove(string(root) + "/lock.db"), err)
-					throw std::runtime_error(err.message());
+				std::filesystem::remove(string(root) + "/lock.db");
 
 				return string(root) + "/latest.db";
 			}

@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
     size_t files = 64;
     size_t net_buffer = 16;
     size_t max_memory = 128;
-    bool validate = false, auto_clear_bad_state = false;
+    bool validate = false, auto_clear_bad_state = false, disable_mapping = true;
 
     size_t compression = 13;
     size_t block_grouping = 16;
@@ -188,6 +188,7 @@ int main(int argc, char* argv[])
         option("-sc", "--scope").doc("Calculate Folder Size to enable progress").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
+        option("-dm", "--disable_mapping").doc("used buffered io instead of memory mapping").set(disable_mapping),
         option("-ac", "--auto_clear_bad_state").doc("Recover with any errors from previous backup failures.").set(auto_clear_bad_state),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive),
         option("-ph", "--httpport").doc("HTTP Port") & value("hport", hport),
@@ -199,7 +200,7 @@ int main(int argc, char* argv[])
     bool running = true;
     d8u::util::Statistics _stats;
     d8u::util::Statistics* pstats = &_stats;
-    StorageService* pservice = nullptr;
+    StorageService2* pservice = nullptr;
     volstore::BinaryStoreClient* pclient = nullptr;
     std::string current_file,pk;
 
@@ -271,10 +272,16 @@ int main(int argc, char* argv[])
             {
                 if (auto_clear_bad_state)
                 {
-                    if (std::filesystem::exists(snapshot + "\\lock.db"))
+                    if (snapshot.size() && std::filesystem::exists(snapshot + "\\lock.db"))
                     {
                         std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
                         std::filesystem::remove_all(snapshot);
+                    }
+
+                    if (image.size() && std::filesystem::exists(image + "\\lock.db"))
+                    {
+                        std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
+                        std::filesystem::remove(image + "\\lock.db");
                     }
                 }
 
@@ -329,41 +336,84 @@ int main(int argc, char* argv[])
                 case switch_t("backup"):
                     if (auto_clear_bad_state)
                     {
-                        if (std::filesystem::exists(snapshot + "\\lock.db"))
+                        if (snapshot.size() && std::filesystem::exists(snapshot + "\\lock.db"))
                         {
                             std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
                             std::filesystem::remove_all(snapshot);
                         }
+
+                        if (image.size() && std::filesystem::exists(image + "\\lock.db"))
+                        {
+                            std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
+                            std::filesystem::remove(image + "\\lock.db");
+                        }
                     }
 
-                    if (vss)
+                    if (disable_mapping)
                     {
-#ifdef _WIN32
-                        if (recursive)
+                        if (vss)
                         {
-                            std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,max_memory * 1024 * 1024);
+#ifdef _WIN32
+                            if (recursive)
+                            {
+                                std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::vss_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                            }
+                            else
+                            {
+                                std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::vss_single2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                            }
+#else
+                            std::cout << "VSS Not available on non-windows platform." << std::endl;
+#endif
                         }
                         else
                         {
-                            std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::vss_single2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                            if (recursive)
+                            {
+                                std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::recursive_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                            }
+                            else
+                            {
+                                std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::single_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                            }
                         }
-#else
-                        std::cout << "VSS Not available on non-windows platform." << std::endl;
-#endif
                     }
                     else
                     {
-                        if (recursive)
+
+                        if (vss)
                         {
-                            std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::recursive_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory * 1024 * 1024);
+#ifdef _WIN32
+                            if (recursive)
+                            {
+                                std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::vss_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                            }
+                            else
+                            {
+                                std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::vss_single2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                            }
+#else
+                            std::cout << "VSS Not available on non-windows platform." << std::endl;
+#endif
                         }
                         else
                         {
-                            std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                            result = backup::single_folder2(json,snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024,"",0, max_memory * 1024 * 1024);
+                            if (recursive)
+                            {
+                                std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::recursive_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                            }
+                            else
+                            {
+                                std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
+                                result = backup::single_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                            }
                         }
                     }
 
@@ -515,7 +565,7 @@ int main(int argc, char* argv[])
 
             if (storage_server)
             {
-                StorageService service(path, threads,true,hport,qport,rport,wport);
+                StorageService2 service(path, threads,hport,qport,rport,wport);
                 pservice = &service;
 
                 pstats = service.Stats();
@@ -526,7 +576,7 @@ int main(int argc, char* argv[])
             {
                 if (image.size())
                 {
-                    volstore::Image store(image);
+                    volstore::Image2 store(image);
                     do_switch(store);
                 }
                 else
@@ -579,8 +629,9 @@ int main(int argc, char* argv[])
     if(pk.size()) std::cout << std::endl << std::endl << "Key: " << pk << std::endl << std::endl;
 
     std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
+    uint64_t seconds = elapsed.count();
 
-    std::cout << std::endl << "Finished in: " << elapsed.count() << "s" << std::endl;
+    std::cout << std::endl << "Finished in: " << (seconds / 60) << "m " << (seconds % 60) << "s" << std::endl;
 
     return 0;
 }
