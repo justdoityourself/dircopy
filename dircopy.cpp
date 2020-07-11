@@ -277,12 +277,6 @@ int main(int argc, char* argv[])
                         std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
                         std::filesystem::remove_all(snapshot);
                     }
-
-                    if (image.size() && std::filesystem::exists(image + "\\lock.db"))
-                    {
-                        std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
-                        std::filesystem::remove(image + "\\lock.db");
-                    }
                 }
 
                 std::cout << "Computing size of folder ( Enables percent complete, see --scope )" << std::endl;
@@ -340,12 +334,6 @@ int main(int argc, char* argv[])
                         {
                             std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
                             std::filesystem::remove_all(snapshot);
-                        }
-
-                        if (image.size() && std::filesystem::exists(image + "\\lock.db"))
-                        {
-                            std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
-                            std::filesystem::remove(image + "\\lock.db");
                         }
                     }
 
@@ -576,6 +564,15 @@ int main(int argc, char* argv[])
             {
                 if (image.size())
                 {
+                    if (auto_clear_bad_state)
+                    {
+                        if (image.size() && std::filesystem::exists(image + "\\lock.db"))
+                        {
+                            std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
+                            std::filesystem::remove(image + "\\lock.db");
+                        }
+                    }
+
                     volstore::Image2 store(image);
                     do_switch(store);
                 }
