@@ -17,7 +17,7 @@ namespace dircopy
 		using namespace d8u::util;
 		using namespace d8u::transform;
 
-		template < typename S, typename D > class Path
+		template < typename TH, typename S, typename D > class Path
 		{
 			S & store;
 			D & domain;
@@ -28,14 +28,14 @@ namespace dircopy
 			bool validate;
 
 		public:
-			Path(const DefaultHash & folder_key, S & _s, D& _d, bool v = true)
+			Path(const TH & folder_key, S & _s, D& _d, bool v = true)
 				: store(_s)
 				, domain(_d)
 				, validate(v)
 			{
 				auto folder_record = restore::block(stats, folder_key, store, domain, validate);
 
-				auto database = restore::file_memory(stats, gsl::span<DefaultHash>((DefaultHash*)folder_record.data(), folder_record.size() / sizeof(DefaultHash)), store, domain, validate, validate);
+				auto database = restore::file_memory(stats, gsl::span<TH>((TH*)folder_record.data(), folder_record.size() / sizeof(TH)), store, domain, validate, validate);
 
 				db.Open(database);
 			}
@@ -56,7 +56,7 @@ namespace dircopy
 			{
 				return (size_t) db.Iterate([&, f = std::move(f)](uint64_t p)
 				{
-					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
+					auto [size, time, name, keys] = delta::Path<TH>::Decode(db.GetObject(p));
 
 					return f(size,time,name,keys);
 				});
@@ -68,7 +68,7 @@ namespace dircopy
 
 				db.Iterate([&, f = std::move(f)](uint64_t p)
 				{
-					auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
+					auto [size, time, name, keys] = delta::Path<TH>::Decode(db.GetObject(p));
 
 					auto it = std::search(name.begin(), name.end(), target.begin(), target.end(), [](char ch1, char ch2) { return std::tolower(ch1) == std::tolower(ch2); });
 
@@ -97,7 +97,7 @@ namespace dircopy
 				if (keys.size() == 1)
 				{
 					temp = restore::block(stats, *keys.data(), store, domain, P);
-					keys = gsl::span<DefaultHash>((DefaultHash*)temp.data(), temp.size() / sizeof(DefaultHash));
+					keys = gsl::span<TH>((TH*)temp.data(), temp.size() / sizeof(TH));
 				}
 	
 				return restore::file_memory(stats, keys, store, domain, validate, validate);
@@ -105,18 +105,18 @@ namespace dircopy
 
 			void Fetch(std::string_view _name, std::string_view dest, size_t P = 4)
 			{
-				std::vector<uint8_t> temp;
+				d8u::sse_vector temp;
 				auto p = db.Find(_name);
 
 				if (!p)
 					return;
 
-				auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(*p));
+				auto [size, time, name, keys] = delta::Path<TH>::Decode(db.GetObject(*p));
 
 				if (keys.size() == 1)
 				{
 					temp = restore::block(stats, *keys.data(), store, domain, P);
-					keys = gsl::span<DefaultHash>((DefaultHash*)temp.data(), temp.size() / sizeof(DefaultHash));
+					keys = gsl::span<TH>((TH*)temp.data(), temp.size() / sizeof(TH));
 				}
 
 				restore::_file2(stats, dest,keys, store, domain, validate, validate, P);

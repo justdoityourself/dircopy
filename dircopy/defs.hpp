@@ -4,6 +4,7 @@
 
 #include "d8u/transform.hpp"
 #include "d8u/util.hpp"
+#include "d8u/memory.hpp"
 
 namespace dircopy
 {
@@ -14,18 +15,18 @@ namespace dircopy
 
 #pragma pack( push, 1 )
 
-		struct DiskHeader
+		template < typename T = _DefaultHash > struct DiskHeader
 		{
 			uint64_t size;
-			DefaultHash block_zero;
-			DefaultHash block_n;
-			Audit audit;
+			T block_zero;
+			T block_n;
+			Audit<T> audit;
 		};
 
-		struct VolumeHeader
+		template < typename T = _DefaultHash> struct VolumeHeader
 		{
-			DefaultHash key;
-			Audit audit;
+			T key;
+			Audit<T> audit;
 			uint32_t disk;
 			uint32_t part;
 			uint64_t start;
@@ -39,15 +40,15 @@ namespace dircopy
 			uint16_t desc_len;
 		};
 
-		struct KeyResult
+		template < typename T = _DefaultHash> struct KeyResult
 		{
-			DefaultHash key;
+			T key;
 			Direct stats;
 		};
 
 		struct BlockResult
 		{
-			std::vector<uint8_t> key_list;
+			d8u::sse_vector key_list;
 			Direct stats;
 		};
 

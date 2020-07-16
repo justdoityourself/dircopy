@@ -25,6 +25,14 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="SSE|Win32">
+      <Configuration>SSE</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="SSE|x64">
+      <Configuration>SSE</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Test|Win32">
       <Configuration>Test</Configuration>
       <Platform>Win32</Platform>
@@ -68,6 +76,13 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SSE|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -96,6 +111,14 @@
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SSE|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -113,6 +136,9 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='AVX2|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SSE|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -125,6 +151,9 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='AVX2|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='SSE|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -134,12 +163,12 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\blocksync;..\d8u;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>../template_hash;..\common\minilzo-2.10;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\blocksync;..\d8u;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Debug;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\minimalhttp;../volsnap;../template_db;../volstore;..\common\LZMA19.00;..\common\cryptopp8.2;../d8u;../volrng;$(IncludePath)</IncludePath>
+    <IncludePath>..\common\minilzo-2.10;..\minimalhttp;../volsnap;../template_db;../volstore;..\common\LZMA19.00;..\common\cryptopp8.2;../d8u;../volrng;$(IncludePath)</IncludePath>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
     <LibraryPath>..\common\cryptopp8.2\CryptoPP\x64\Output\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
@@ -149,16 +178,25 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='AVX2|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SSE|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\blocksync;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;$(IncludePath)</IncludePath>
+    <IncludePath>..\common\minilzo-2.10;..\blocksync;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='AVX2|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;..\blocksync;$(IncludePath)</IncludePath>
+    <IncludePath>../template_hash;..\common\minilzo-2.10;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;..\blocksync;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Release;$(LibraryPath)</LibraryPath>
     <TargetName>$(ProjectName)_avx2</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='SSE|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>../template_hash;..\common\minilzo-2.10;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;..\blocksync;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Release;$(LibraryPath)</LibraryPath>
+    <TargetName>$(ProjectName)_sse</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -198,6 +236,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -261,6 +300,24 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SSE|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>
@@ -296,6 +353,33 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>cryptlib.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='SSE|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_WINSOCK_DEPRECATED_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -351,9 +435,13 @@
     <ClCompile Include="..\common\LZMA19.00\LZMA\XzDec.c" />
     <ClCompile Include="..\common\LZMA19.00\LZMA\XzEnc.c" />
     <ClCompile Include="..\common\LZMA19.00\LZMA\XzIn.c" />
+    <ClCompile Include="..\common\minilzo-2.10\minilzo\minilzo.c" />
     <ClCompile Include="dircopy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\lzoconf.h" />
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\lzodefs.h" />
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\minilzo.h" />
     <ClInclude Include="dircopy\backup.hpp" />
     <ClInclude Include="dircopy\defs.hpp" />
     <ClInclude Include="dircopy\mount.hpp" />
@@ -363,6 +451,8 @@
     <ClInclude Include="dircopy\validate.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\common\minilzo-2.10\minilzo\COPYING" />
+    <None Include="..\common\minilzo-2.10\minilzo\README.LZO" />
     <None Include=".gitignore" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

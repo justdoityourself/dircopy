@@ -16,7 +16,7 @@ namespace dircopy
 		using namespace d8u::transform;
 		using namespace d8u::json;
 
-		class Path
+		template < typename TH = _DefaultHash> class Path
 		{
 			tdb::TinyHashmapSafe change;
 			tdb::TinyHashmapSafe previous;
@@ -181,7 +181,7 @@ namespace dircopy
 
 				uint16_t ds = *(uint16_t*)(p + 22 + ns);
 
-				span<DefaultHash> data((DefaultHash*)(p + 24+ns), ds / sizeof(DefaultHash));
+				span<TH> data((TH*)(p + 24+ns), ds / sizeof(TH));
 
 				return std::make_tuple(size, time, name, data);
 			}

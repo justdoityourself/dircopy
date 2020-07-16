@@ -19,6 +19,9 @@
     <Filter Include="lzma">
       <UniqueIdentifier>{7ae300fd-f4a4-41e2-957e-c96946859468}</UniqueIdentifier>
     </Filter>
+    <Filter Include="minilzo">
+      <UniqueIdentifier>{1205908f-667a-4be1-876c-b5649036e5fe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dircopy.cpp">
@@ -156,6 +159,9 @@
     <ClCompile Include="..\common\LZMA19.00\LZMA\XzIn.c">
       <Filter>lzma</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\minilzo-2.10\minilzo\minilzo.c">
+      <Filter>minilzo</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dircopy\backup.hpp">
@@ -179,8 +185,23 @@
     <ClInclude Include="dircopy\delta.hpp">
       <Filter>dircopy</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\lzoconf.h">
+      <Filter>minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\lzodefs.h">
+      <Filter>minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\minilzo-2.10\minilzo\minilzo.h">
+      <Filter>minilzo</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="..\common\minilzo-2.10\minilzo\COPYING">
+      <Filter>minilzo</Filter>
+    </None>
+    <None Include="..\common\minilzo-2.10\minilzo\README.LZO">
+      <Filter>minilzo</Filter>
+    </None>
   </ItemGroup>
 </Project>

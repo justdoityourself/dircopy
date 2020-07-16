@@ -44,12 +44,15 @@ int main(int argc, char* argv[])
 #include "d8u/transform.hpp"
 #include "d8u/json.hpp"
 #include "d8u/compare.hpp"
+#include "d8u/memory.hpp"
 
 #include "dircopy/backup.hpp"
 #include "dircopy/validate.hpp"
 #include "dircopy/mount.hpp"
 
 #include "blocksync/sync.hpp"
+
+#include "hash/state.hpp"
 
 using std::string;
 using namespace clipp;
@@ -58,6 +61,18 @@ using namespace dircopy;
 using namespace volstore::api;
 
 /*
+
+
+        -i cli/image -a backup -p testdata -s cli/snap --compression 21
+        -ac -ah -i cli/image -a backup -p testdata -s cli/snap --compression 21
+
+        -ah -i cli/image -a validate_deep -k 43303955bf9c108448886fdaae6708855c9fe09c9bd56a1abe7c28528abb8827
+
+        -i cli/image -a validate_deep -k ea9d02542976326f612d79fe67676b1be5ecdb571564a89871977159af5d2de2
+
+
+
+
     CLI:
 
     -i cli/image -a backup -p testdata -s cli/snap
@@ -68,8 +83,6 @@ using namespace volstore::api;
 
         Threads 0, Files 0, Read 130940761, Write 92648156, Duplicate 0
         Finished in: 5.34995s
-
-
 
     -i cli/image -a validate_deep -k e52b3b6bc693195ffd4a3bc88f0a2db931aacf82d4721556c64b9cb34dbfc511
 
@@ -150,11 +163,10 @@ using namespace volstore::api;
 //TODO A store B store switching
 //TODO METADATA LEVEL
 
+template < typename T > struct tag_t { using type = T; };
 
 int main(int argc, char* argv[])
 {
-    d8u::transform::DefaultHash key;
-
     bool vss = false, recursive = true, storage_server = false, scope = false;
     string path = "", snapshot = "", host = "", image = "", action = "backup", skey = "", dest = "", json = "", sdomain="";
     string hport = "8008", qport="9009", rport="1010", wport="1111";
@@ -162,11 +174,11 @@ int main(int argc, char* argv[])
     size_t files = 64;
     size_t net_buffer = 16;
     size_t max_memory = 128;
-    bool validate = false, auto_clear_bad_state = false, disable_mapping = true;
+    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false;
 
     size_t compression = 13;
     size_t block_grouping = 16;
-    std::vector<uint8_t> domain;
+    d8u::sse_vector domain;
 
     auto cli = (
         option("-c", "--config").doc("Json configuration file") & value("json", json),
@@ -188,7 +200,9 @@ int main(int argc, char* argv[])
         option("-sc", "--scope").doc("Calculate Folder Size to enable progress").set(scope),
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
+        option("-sq", "--sequence").doc("Validate Blocks that are read or restored").set(sequence),
         option("-dm", "--disable_mapping").doc("used buffered io instead of memory mapping").set(disable_mapping),
+        option("-ah", "--aux_hash").doc("Use faster hash for slower hardware").set(aux_hash),
         option("-ac", "--auto_clear_bad_state").doc("Recover with any errors from previous backup failures.").set(auto_clear_bad_state),
         option("-r", "--recursive").doc("Recursive enumeration of directories").set(recursive),
         option("-ph", "--httpport").doc("HTTP Port") & value("hport", hport),
@@ -200,7 +214,13 @@ int main(int argc, char* argv[])
     bool running = true;
     d8u::util::Statistics _stats;
     d8u::util::Statistics* pstats = &_stats;
-    StorageService2* pservice = nullptr;
+
+    using fast_hash = d8u::custom_hash::DefaultHashT<template_hash::stateful::State_16_32_1>;
+    //using fast_hash = d8u::custom_hash::DefaultHashT<template_hash::stateful::State_8_32_1>;
+
+    StorageService2<d8u::transform::_DefaultHash>* pservice2 = nullptr;
+    StorageService2<fast_hash>* pservice1 = nullptr;
+
     volstore::BinaryStoreClient* pclient = nullptr;
     std::string current_file,pk;
 
@@ -212,12 +232,18 @@ int main(int argc, char* argv[])
         {
             pstats->Print();
 
-            if(pservice)
-                std::cout << "[ C: " << pservice->ConnectionCount() 
-                << " M: " << pservice->MessageCount() 
-                << " S: " << pservice->EventsStarted() 
-                << " F: " << pservice->EventsFinished() 
-                << " R: " << pservice->ReplyCount()  << " ]\r" << std::flush;
+            if(pservice1)
+                std::cout << "[ C: " << pservice1->ConnectionCount() 
+                << " M: " << pservice1->MessageCount() 
+                << " S: " << pservice1->EventsStarted() 
+                << " F: " << pservice1->EventsFinished() 
+                << " R: " << pservice1->ReplyCount()  << " ]\r" << std::flush;
+            else if (pservice2)
+                std::cout << "[ C: " << pservice2->ConnectionCount()
+                << " M: " << pservice2->MessageCount()
+                << " S: " << pservice2->EventsStarted()
+                << " F: " << pservice2->EventsFinished()
+                << " R: " << pservice2->ReplyCount() << " ]\r" << std::flush;
             else if(pclient)
                 std::cout << "[ W: " << pclient->Writes() << " R: " << pclient->Reads() << " ] " << current_file << "\t\t\r" << std::flush;
             else
@@ -282,29 +308,26 @@ int main(int argc, char* argv[])
                 std::cout << "Computing size of folder ( Enables percent complete, see --scope )" << std::endl;
 
                 if (recursive)
-                    _stats.direct.target = backup::recursive_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true; });
+                    _stats.direct.target = backup::recursive_delta<d8u::transform::_DefaultHash>(json, snapshot, path, [](auto name, auto size, auto time) { return true; });
                 else
-                    _stats.direct.target = backup::single_delta(json, snapshot, path, [](auto name, auto size, auto time) { return true;  });
+                    _stats.direct.target = backup::single_delta< d8u::transform::_DefaultHash>(json, snapshot, path, [](auto name, auto size, auto time) { return true;  });
             }
 
             if (sdomain.size())
-                domain = d8u::util::to_bin(sdomain);
+            {
+                domain = d8u::util::to_bin_sse(sdomain);
+            }
             else
             {
                 domain.resize(d8u::util::default_domain.size());
                 std::copy(d8u::util::default_domain.begin(), d8u::util::default_domain.end(), domain.begin());
             }
 
-            if (skey.size())
-                key = d8u::util::to_bin_t<d8u::transform::DefaultHash>(skey);
-
             if (snapshot.size())
                 std::filesystem::create_directories(snapshot);
 
             if (image.size())
                 std::filesystem::create_directories(image);
-
-            d8u::transform::DefaultHash result;
 
             auto on_file = [&](auto & name, auto size, auto time)
             {
@@ -323,8 +346,15 @@ int main(int argc, char* argv[])
                 return true;
             };
 
-            auto do_switch = [&](auto& store)
+            auto do_switch = [&](auto& store, auto _hash_t)
             {
+                using hash_t = typename decltype(_hash_t)::type;
+
+                hash_t key,result;
+
+                if (skey.size())
+                    key = d8u::util::to_bin_t<hash_t>(skey);
+
                 switch (switch_t(action))
                 {
                 case switch_t("backup"):
@@ -345,12 +375,12 @@ int main(int argc, char* argv[])
                             if (recursive)
                             {
                                 std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::vss_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                                result = backup::vss_folder2<false, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024,sequence);
                             }
                             else
                             {
                                 std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::vss_single2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                                result = backup::vss_single2<false, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024,sequence);
                             }
 #else
                             std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -361,12 +391,12 @@ int main(int argc, char* argv[])
                             if (recursive)
                             {
                                 std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::recursive_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                                result = backup::recursive_folder2<false, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024,sequence);
                             }
                             else
                             {
                                 std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::single_folder2<false>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                                result = backup::single_folder2<false, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024,sequence);
                             }
                         }
                     }
@@ -379,12 +409,12 @@ int main(int argc, char* argv[])
                             if (recursive)
                             {
                                 std::cout << "VSS Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::vss_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                                result = backup::vss_folder2<true, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024,sequence);
                             }
                             else
                             {
                                 std::cout << "VSS Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::vss_single2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024);
+                                result = backup::vss_single2<true, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, max_memory * 1024 * 1024,sequence);
                             }
 #else
                             std::cout << "VSS Not available on non-windows platform." << std::endl;
@@ -395,12 +425,12 @@ int main(int argc, char* argv[])
                             if (recursive)
                             {
                                 std::cout << "Recursive Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::recursive_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                                result = backup::recursive_folder2<true, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024,sequence);
                             }
                             else
                             {
                                 std::cout << "Directory Backup: " << path << "; State: " << snapshot << "; Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
-                                result = backup::single_folder2(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024);
+                                result = backup::single_folder2<true, hash_t>(json, snapshot, _stats, path, store, on_file, domain, files, 1024 * 1024, threads, compression, block_grouping, 128 * 1024 * 1024, "", 0, max_memory * 1024 * 1024,sequence);
                             }
                         }
                     }
@@ -432,14 +462,14 @@ int main(int argc, char* argv[])
                     console.join();
 
                     if (recursive)
-                        backup::recursive_delta(json,snapshot, path, [](auto name, auto size, auto time)
+                        backup::recursive_delta<hash_t>(json,snapshot, path, [](auto name, auto size, auto time)
                         {
                             std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
 
                             return true;
                         });
                     else
-                        backup::single_delta(json,snapshot, path, [](auto name, auto size, auto time)
+                        backup::single_delta<hash_t>(json,snapshot, path, [](auto name, auto size, auto time)
                         {
                             std::cout << name << " " << size << " bytes " << time << " changed" << std::endl;
 
@@ -515,50 +545,104 @@ int main(int argc, char* argv[])
 
             bool simple_command = false;
 
-            switch (switch_t(action))
+            auto simple = [&](auto _hash_t)
             {
-            case switch_t("compare"):
+                using hash_t = typename decltype(_hash_t)::type;
 
-                std::cout << "Compare: " << path << " " << host << std::endl << std::endl;
+                hash_t key;
 
-                if(d8u::compare::folders(path,host,files))
-                    std::cout << "Match!" << std::endl;
-                else
-                    std::cout << "DIFFERENT" << std::endl;
+                if (skey.size())
+                    key = d8u::util::to_bin_t<hash_t>(skey);
 
-                simple_command = true;
-                break;
-            case switch_t("sync"):
-            {
-                std::cout << "Sync: " << image << " " << host << std::endl << std::endl;
+                switch (switch_t(action))
+                {
+                case switch_t("compare"):
 
-                blocksync::Sync<volstore::Image, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
+                    std::cout << "Compare: " << path << " " << host << std::endl << std::endl;
 
-                sync_handle.Push(_stats, validate, threads);
+                    if (d8u::compare::folders(path, host, files))
+                        std::cout << "Match!" << std::endl;
+                    else
+                        std::cout << "DIFFERENT" << std::endl;
 
-                simple_command = true;
-            }   break;
-            case switch_t("migrate"):
-            {
-                std::cout << "Migrate: " << image << " " << skey << " " << host << std::endl << std::endl;
+                    simple_command = true;
+                    break;
+                case switch_t("sync"):
+                {
+                    std::cout << "Sync: " << image << " " << host << std::endl << std::endl;
 
-                blocksync::Sync<volstore::Image, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
+                    if (aux_hash)
+                    {
+                        blocksync::Sync<hash_t, volstore::Image<fast_hash>, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
 
-                sync_handle.MigrateFolder(_stats, key, domain,validate, files,threads);
+                        sync_handle.Push(_stats, validate, threads);
+                    }
+                    else
+                    {
+                        blocksync::Sync<hash_t, volstore::Image<d8u::transform::_DefaultHash>, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
 
-                simple_command = true;
-            }   break;
-            default: break;
-            }
+                        sync_handle.Push(_stats, validate, threads);
+                    }
+
+                    simple_command = true;
+                }   break;
+                case switch_t("migrate"):
+                {
+                    std::cout << "Migrate: " << image << " " << skey << " " << host << std::endl << std::endl;
+
+                    if (aux_hash)
+                    {
+                        blocksync::Sync<hash_t, volstore::Image<fast_hash>, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
+
+                        sync_handle.MigrateFolder(_stats, key, domain, validate, files, threads);
+                    }
+                    else
+                    {
+                        blocksync::Sync<hash_t, volstore::Image<d8u::transform::_DefaultHash>, volstore::BinaryStoreClient> sync_handle(snapshot, image, host);
+
+                        sync_handle.MigrateFolder(_stats, key, domain, validate, files, threads);
+                    }
+
+                    simple_command = true;
+                }   break;
+                default: break;
+                }
+            };
+
+            if (aux_hash)
+                simple(tag_t<fast_hash>());
+            else
+                simple(tag_t<d8u::transform::_DefaultHash>());
 
             if (storage_server)
             {
-                StorageService2 service(path, threads,hport,qport,rport,wport);
-                pservice = &service;
+                if (auto_clear_bad_state)
+                {
+                    if (path.size() && std::filesystem::exists(path + "\\lock.db"))
+                    {
+                        std::cout << "Clearing previous bad server state ( see --auto_clear_bad_state )" << std::endl;
+                        std::filesystem::remove(path + "\\lock.db");
+                    }
+                }
 
-                pstats = service.Stats();
+                if (aux_hash)
+                {
+                    StorageService2< fast_hash> service(path, threads, hport, qport, rport, wport);
+                    pservice1 = &service;
 
-                service.Join();
+                    pstats = service.Stats();
+
+                    service.Join();
+                }
+                else
+                {
+                    StorageService2< d8u::transform::_DefaultHash> service(path, threads, hport, qport, rport, wport);
+                    pservice2 = &service;
+
+                    pstats = service.Stats();
+
+                    service.Join();
+                }
             }
             else if(!simple_command)
             {
@@ -571,10 +655,18 @@ int main(int argc, char* argv[])
                             std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
                             std::filesystem::remove(image + "\\lock.db");
                         }
-                    }
+                    }                
 
-                    volstore::Image2 store(image);
-                    do_switch(store);
+                    if (aux_hash)
+                    {
+                        volstore::Image2< fast_hash> store(image);
+                        do_switch(store, tag_t<fast_hash>());
+                    }
+                    else
+                    {
+                        volstore::Image2< d8u::transform::_DefaultHash> store(image);
+                        do_switch(store, tag_t<d8u::transform::_DefaultHash>());
+                    }
                 }
                 else
                 {
@@ -604,7 +696,11 @@ int main(int argc, char* argv[])
 
                     volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer * 1024 * 1024);
                     pclient = &store;
-                    do_switch(store);
+                    
+                    if (aux_hash)
+                        do_switch(store, tag_t<fast_hash>());
+                    else
+                        do_switch(store, tag_t<d8u::transform::_DefaultHash>());
                 }
             }
         }

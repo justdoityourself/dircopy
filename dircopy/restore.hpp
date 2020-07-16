@@ -8,6 +8,7 @@
 #include "d8u/transform.hpp"
 #include "defs.hpp"
 #include "delta.hpp"
+#include "d8u/memory.hpp"
 
 #include "d8u/util.hpp"
 #include "../mio.hpp"
@@ -22,9 +23,9 @@ namespace dircopy
 
 
 
-		template <typename S, typename D> std::vector<uint8_t> block(Statistics & s,const DefaultHash& key, S& store, const D& domain, bool validate = false)
+		template <typename TH,typename S, typename D> d8u::sse_vector block(Statistics & s,const TH& key, S& store, const D& domain, bool validate = false)
 		{
-			auto file_id = key.Next();
+			auto file_id = key.GetNext();
 			auto block = store.Read(file_id);
 
 			s.atomic.blocks++;
@@ -34,7 +35,7 @@ namespace dircopy
 
 			if (validate)
 			{
-				DefaultHash dup_key(domain, block);
+				TH dup_key(domain, block);
 
 				if (!std::equal(key.begin(), key.end(), dup_key.begin()))
 					throw std::runtime_error("Corrupt Block");
@@ -43,12 +44,12 @@ namespace dircopy
 			return block;
 		}
 
-		template <typename S, typename D> std::vector<uint8_t> file_memory(Statistics& s, span<DefaultHash> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false)
+		template <typename TH, typename S, typename D> d8u::sse_vector file_memory(Statistics& s, span<TH> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false)
 		{
-			std::vector<uint8_t> result;
+			d8u::sse_vector result;
 			result.reserve(keys.size() * 1024 * 1024);
 
-			HashState state;
+			typename TH::State state;
 
 			if (hash_file)
 				state.Update(domain);
@@ -77,9 +78,9 @@ namespace dircopy
 			return result;
 		}
 
-		template <typename S, typename D> void _file2(Statistics& s, std::string_view dest, span<DefaultHash> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename TH, typename S, typename D> void _file2(Statistics& s, std::string_view dest, span<TH> keys, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
-			HashState state;
+			typename TH::State state;
 
 			if (hash_file)
 				state.Update(domain);
@@ -111,7 +112,7 @@ namespace dircopy
 			else
 			{
 				std::atomic<int> local = 0;
-				std::vector<std::vector<uint8_t>> map; map.resize(keys.size() - 1);
+				std::vector<d8u::sse_vector> map; map.resize(keys.size() - 1);
 
 				std::thread io([&]()
 				{
@@ -157,30 +158,30 @@ namespace dircopy
 			}
 		}
 
-		template <typename S, typename D> void file2(Statistics& s, std::string_view dest, const DefaultHash& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename TH, typename S, typename D> void file2(Statistics& s, std::string_view dest, const TH& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
 			auto file_record = block(s,file_key, store, domain, validate_blocks);
 
-			if (file_record.size() % sizeof(DefaultHash) != 0)
+			if (file_record.size() % sizeof(TH) != 0)
 				throw std::runtime_error("Malformed File Record");
 
-			auto keys = span<DefaultHash>((DefaultHash*)file_record.data(), file_record.size() / sizeof(DefaultHash));
+			auto keys = span<TH>((TH*)file_record.data(), file_record.size() / sizeof(TH));
 
 			_file2(s,dest, keys, store, domain, validate_blocks, hash_file, P);
 		}
 
-		template <typename S, typename D> void folder2(Statistics & s,std::string_view dest, const DefaultHash& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename TH, typename S, typename D> void folder2(Statistics & s,std::string_view dest, const TH& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			auto folder_record = block(s, folder_key, store, domain, validate_blocks);
 
-			auto database = restore::file_memory(s, gsl::span<DefaultHash>((DefaultHash*)folder_record.data(), folder_record.size() / sizeof(DefaultHash)), store, domain, validate_blocks, hash_file);
+			auto database = restore::file_memory(s, gsl::span<TH>((TH*)folder_record.data(), folder_record.size() / sizeof(TH)), store, domain, validate_blocks, hash_file);
 
 			typename tdb::MemoryHashmap db(database);
 
 			{
-				auto [size, time, name, data] = delta::Path::DecodeRaw(db.FindObject(domain));
+				auto [size, time, name, data] = delta::Path<TH>::DecodeRaw(db.FindObject(domain));
 
-				auto stats = (delta::Path::FolderStatistics * )data.data();
+				auto stats = (typename delta::Path<TH>::FolderStatistics * )data.data();
 
 				s.direct.target = stats->size;
 			}
@@ -189,7 +190,7 @@ namespace dircopy
 			{
 				dec_scope lock(s.atomic.files);
 
-				auto [size, time, name, keys] = delta::Path::Decode(db.GetObject(p));
+				auto [size, time, name, keys] = delta::Path<TH>::Decode(db.GetObject(p));
 
 				if (!size)
 				{
@@ -240,7 +241,7 @@ namespace dircopy
 			}
 		}
 
-		template <typename S, typename D> Direct file( std::string_view dest, const DefaultHash& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
+		template <typename TH, typename S, typename D> Direct file( std::string_view dest, const TH& file_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t P = 1)
 		{
 			Statistics s;
 		
@@ -249,7 +250,7 @@ namespace dircopy
 			return s.direct;
 		}
 
-		template <typename S, typename D> Direct folder(std::string_view dest, const DefaultHash& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
+		template <typename TH, typename S, typename D> Direct folder(std::string_view dest, const TH& folder_key, S& store, const D& domain, bool validate_blocks = false, bool hash_file = false, size_t BLOCK = 1024 * 1024, size_t THRESHOLD = 128 * 1024 * 1024, size_t P = 1, size_t F = 1)
 		{
 			Statistics s;
 
