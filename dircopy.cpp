@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
     StorageService2<d8u::transform::_DefaultHash>* pservice2 = nullptr;
     StorageService2<fast_hash>* pservice1 = nullptr;
 
-    volstore::BinaryStoreClient* pclient = nullptr;
+    volstore::BinaryStoreClient2<>* pclient = nullptr;
     std::string current_file,pk;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -694,7 +694,16 @@ int main(int argc, char* argv[])
                         break;
                     }
 
-                    volstore::BinaryStoreClient store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer * 1024 * 1024);
+                    if (auto_clear_bad_state)
+                    {
+                        if (snapshot.size() && std::filesystem::exists(snapshot + "\\lock.db"))
+                        {
+                            std::cout << "Clearing previous bad state ( see --auto_clear_bad_state )" << std::endl;
+                            std::filesystem::remove_all(snapshot);
+                        }
+                    }
+
+                    volstore::BinaryStoreClient2<> store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer * 1024 * 1024);
                     pclient = &store;
                     
                     if (aux_hash)

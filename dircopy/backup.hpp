@@ -27,6 +27,7 @@
 
 #include "d8u/util.hpp"
 #include "d8u/memory.hpp"
+#include "d8u/async.hpp"
 
 #include "delta.hpp"
 
@@ -371,7 +372,7 @@ namespace dircopy
 			//Map, id and backup one block at a time:
 			//
 
-			if (sq != -1)
+			/*if (sq != -1)
 			{
 				size_t cq = stats.atomic.sequence.load();
 
@@ -381,7 +382,7 @@ namespace dircopy
 
 					cq = stats.atomic.sequence.load();
 				}
-			}
+			}*/
 
 			std::thread sequential_hash([&]()
 			{
@@ -403,7 +404,9 @@ namespace dircopy
 					stats.atomic.threads++;
 					local_threads++;
 
-					std::thread(save, std::move(blocks[dx]), dx).detach();
+					//std::thread(save, std::move(blocks[dx]), dx).detach();
+
+					save(std::move(blocks[dx]), dx);
 
 					dx++;
 				}
@@ -765,7 +768,7 @@ namespace dircopy
 			return total_size;
 		}
 
-		template < bool MMAP = true, typename DITR, typename TH, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path<TH> & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0, size_t MAX_MEMORY = 128*1024*1024, bool use_sequence = false)
+		template < bool MMAP = true, typename DITR, typename TH, typename STORE, typename ON_FILE, typename D > void core_folder_graph(delta::Path<TH> & db, Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0, size_t MAX_MEMORY = 128*1024*1024, bool use_sequence = false)
 		{
 			try
 			{
@@ -859,6 +862,331 @@ namespace dircopy
 			
 			while (stats.atomic.files.load() || stats.atomic.threads.load())
 				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+
+		template < bool MMAP = true, typename DITR, typename TH, typename STORE, typename ON_FILE, typename D > void core_folder(delta::Path<TH>& db, Statistics& stats, std::string_view path, STORE& store, ON_FILE&& on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel_count = 0, size_t MAX_MEMORY = 128 * 1024 * 1024, bool use_sequence = false)
+		{
+			struct File
+			{
+				File() {}
+
+				File(std::string && _full, std::string&& _rel, uint64_t _size)
+					: full(std::move(_full))
+					, rel(std::move(_rel))
+					, size(_size) {}
+
+				std::string full;
+				std::string rel;
+
+				sse_vector result;
+				std::vector<sse_vector> blocks;
+
+				uint64_t size;
+				uint64_t change_time;
+
+				uint8_t * queue;
+
+				typename TH::State hash_state;
+			};
+
+			struct Block
+			{
+				Block() {}
+
+				Block(sse_vector && _block, const TH& _key, const TH& _id, size_t _size)
+					: buffer(std::move(_block))
+					, key(_key)
+					, id(_id)
+					, size(_size) {}
+
+				sse_vector buffer;
+				TH id;
+				TH key;
+				size_t size;
+			};
+
+			d8u::async::Pipeline<File,6> file_pipeline;
+			d8u::async::Pipeline<Block,5> block_pipeline;
+			d8u::async::Pipeline<std::vector<Block>,2> pool_pipeline;
+
+			constexpr size_t look_ahead = 4096;
+
+			file_pipeline.Start([&](auto & prev,auto& next)
+			{
+				for (auto& e : DITR(path, std::filesystem::directory_options::skip_permission_denied))
+				{
+					if (e.is_directory())
+						continue;
+
+					stats.atomic.items++;
+
+					std::string full;
+
+					try
+					{
+						full = e.path().string();
+					}
+					catch (...)
+					{
+						std::cout << "Skipping file with unicode characters in name..." << std::endl;
+						continue;
+					}
+
+					auto rel = full.substr(path.size());
+
+					next.Push(File(std::move(full), std::move(rel), e.file_size()), look_ahead);
+				}
+			});
+
+			file_pipeline.Stream([&](auto&& file, auto& next)
+			{
+				file.change_time = GetFileWriteTime2(file.full);
+
+				file.queue = db.Queue(file.rel, file.size, file.change_time, BLOCK, LARGE_THRESHOLD);
+
+				if (!file.queue) //Excluded
+					return true;
+
+				if (!db.Changed(file.rel, file.size, file.change_time, file.queue))
+				{
+					stats.atomic.read += file.size;
+					stats.atomic.blocks += (file.size / BLOCK + ((file.size % BLOCK) ? 1 : 0));
+					return true;
+				}
+
+				if (!on_file(file.rel, file.size, file.change_time))
+					return false;
+
+				if (!file.size)
+					db.Apply(file.rel, file.size, file.change_time, sse_vector(), file.queue);
+				else
+				{
+					stats.atomic.files++;
+
+					next.Push(std::move(file),look_ahead);
+				}
+
+				return true;
+			});
+
+			file_pipeline.Stream([&](auto&& file, auto& next)
+			{
+				std::ifstream file_stream(file.full, ios::binary);
+
+				auto count = file.size / BLOCK + ((file.size % BLOCK) ? 1 : 0);
+				file.blocks.resize(count);
+				file.result.resize(sizeof(TH) * (count + 1)); // + File Hash
+
+				gsl::span<sse_vector> result_blocks(file.blocks.data(), file.blocks.size());
+
+				next.Push(std::move(file),look_ahead); //This stage and the next run together
+
+				for (size_t i = 0, dx = 0; i < file.size; i += BLOCK, dx++)
+				{
+					auto rem = file.size - i;
+					auto cur = BLOCK;
+
+					if (rem < cur) cur = rem;
+
+					while (stats.atomic.memory.load() >= MAX_MEMORY)
+						std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+					sse_vector buf(cur);
+					stats.atomic.memory += cur;
+
+					file_stream.read((char*)buf.data(), cur);
+
+					result_blocks[dx] = std::move(buf);
+
+					stats.atomic.read += cur;
+					stats.atomic.blocks++;
+				}
+
+				return true;
+			},FILES);
+
+			file_pipeline.Stream([&](auto&& file, auto& next)
+			{
+				gsl::span<TH> result_keys((TH*)file.result.data(), file.blocks.size() + 1);
+
+				file.hash_state.Update(domain);
+
+				size_t dx = 0;
+				for (auto& block : file.blocks)
+				{
+					while(!block.size()) 
+						std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+					stats.atomic.threads++;
+
+					file.hash_state.Update(block);
+
+					TH id; std::tie(result_keys[dx], id) = identify<TH>(domain, block);
+
+					stats.atomic.threads--;
+
+					block_pipeline.Push(Block(std::move(block), result_keys[dx++],id,block.size()));
+				}
+
+				stats.atomic.files--;
+
+				result_keys[file.blocks.size()] = file.hash_state.FinishT<TH>();
+
+				next.Push(std::move(file));
+
+				return true;
+			}, FILES);
+
+			block_pipeline.Start([&](auto& prev, auto& next)
+			{
+				std::vector<Block> pool(64);
+				size_t cur = 0;
+
+				auto submit = [&]()
+				{
+					if (!cur)
+						return;
+
+					sse_vector query(sizeof(TH)* cur);
+
+					for (size_t i = 0; i < cur; i++)
+						std::memcpy(query.data() + i * sizeof(TH), pool[i].id.data(), sizeof(TH));
+
+					store._Many1<sizeof(TH)>(query);
+					pool.resize(cur);
+					cur = 0;
+
+					stats.atomic.connections++;
+
+					pool_pipeline.Push(std::move(pool));
+					pool.resize(64);
+				};
+
+				auto process = [&]()
+				{
+					switch (store._IsLocal(pool[cur].id))
+					{
+					case 1:	//Have it
+						stats.atomic.duplicate += pool[cur].buffer.size();
+						stats.atomic.dblocks++;
+						stats.atomic.memory -= pool[cur].buffer.size();
+
+						pool[cur].buffer.clear();
+
+						break;
+					case 0: //Don't know, ask again in batch
+
+						if (++cur == 64)
+							submit();
+
+						break;
+					case -1: //Don't have
+						/*
+							Local indication was enough to know this block must be writen.
+						*/
+
+						next.Push(std::move(pool[cur]));
+						break;
+					}
+				};
+
+				while (file_pipeline.Running())
+				{
+					if (prev.TryWait(pool[cur]))
+						process();
+					else
+						submit();
+				}
+
+				while (prev.TryWait(pool[cur]))
+					process();
+
+				submit();
+			});
+
+			pool_pipeline.Start([&](auto& prev, auto& next)
+			{
+				while (file_pipeline.Running())
+				{
+					std::vector<Block> pool;
+					if (prev.Next(file_pipeline.Running(), pool))
+					{
+						auto _bitmap = store._Many2();
+
+						stats.atomic.connections--;
+
+						auto bitmap = std::bitset<64>(_bitmap);
+
+						for (size_t i = 0; i < pool.size(); i++)
+						{
+							if (bitmap[i])
+							{
+								stats.atomic.duplicate += pool[i].buffer.size();
+								stats.atomic.dblocks++;
+
+								stats.atomic.memory -= pool[i].buffer.size();
+
+								pool[i].buffer.clear();
+							}
+							else
+								block_pipeline.Push(std::move(pool[i]), 1);
+						}
+					}
+				}
+			});
+
+			block_pipeline.Stream([&](auto&& block, auto& next)
+			{
+				stats.atomic.threads++;
+
+				encode2<TH>(block.buffer, block.key, block.id, compression);
+
+				stats.atomic.threads--;
+
+				next.Push(std::move(block));
+
+				return true;
+			}, THREADS);
+
+			block_pipeline.Stream([&](auto&& block, auto& next)
+			{
+				stats.atomic.connections++;
+
+				store._Write1(block.id, block.buffer);
+				stats.atomic.write += block.buffer.size();
+				stats.atomic.memory -= block.size;
+
+				next.Push(std::move(block));
+
+				return true;
+			});
+
+			block_pipeline.Stream([&](auto&& block, auto& next)
+			{
+				store._Write2();
+
+				stats.atomic.connections--;
+
+				return true;
+			});
+
+			file_pipeline.Stream([&](auto&& file, auto& next)
+			{
+				if (file.size >= LARGE_THRESHOLD)
+				{
+					auto [key, id] = identify<TH>(domain, file.result);
+
+					stats.atomic.memory += file.result.size();
+
+					block_pipeline.Push(Block(std::move(file.result), key, id,file.result.size()));
+
+					db.Apply(file.rel, file.size, file.change_time, key, file.queue);
+				}
+				else
+					db.Apply(file.rel, file.size, file.change_time, file.result, file.queue);
+
+				return true;
+			});
 		}
 
 		template < bool MMAP = true, typename DITR, typename TH, typename STORE, typename ON_FILE, typename D > TH submit_folder(std::string_view exclude, std::string_view delta_folder,Statistics& stats, std::string_view path, STORE& store, ON_FILE && on_file, const D& domain = default_domain, size_t FILES = 1, size_t BLOCK = 1024 * 1024, size_t THREADS = 1, int compression = 5, size_t GROUP = 1, size_t LARGE_THRESHOLD = 128 * 1024 * 1024, std::string_view drive = "", size_t rel = 0, size_t MAX_MEMORY = 128 * 1024 * 1024, bool sequence = false)
