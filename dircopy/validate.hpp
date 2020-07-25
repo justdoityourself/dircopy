@@ -149,6 +149,9 @@ namespace dircopy
 				auto folder_id = folder_key.GetNext();
 				auto folder_record = store.Read(folder_id);
 
+				if (!validate_block<TH, d8u::sse_vector>(folder_record))
+					return false;
+
 				decode(domain, folder_record, folder_key);
 
 				TH dup_key(domain, folder_record);
@@ -158,7 +161,7 @@ namespace dircopy
 
 				auto database = restore::file_memory(s, gsl::span<TH>((TH*)folder_record.data(),folder_record.size()/sizeof(TH)), store, domain, true, true);
 
-				tdb::MemoryHashmap db(database);
+				tdb::MemoryHashmap db(std::move(database));
 				bool res = true;
 
 				{

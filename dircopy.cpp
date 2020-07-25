@@ -66,7 +66,7 @@ using namespace volstore::api;
         -i cli/image -a backup -p testdata -s cli/snap --compression 21
         -ac -ah -i cli/image -a backup -p testdata -s cli/snap --compression 21
 
-        -ah -i cli/image -a validate_deep -k 43303955bf9c108448886fdaae6708855c9fe09c9bd56a1abe7c28528abb8827
+        -ah -i cli/image -a validate -k cc7ae0ab563ecbb9a124b427757b5cd75d58a6a768ab15a2c7cdf640d54789e1
 
         -i cli/image -a validate_deep -k ea9d02542976326f612d79fe67676b1be5ecdb571564a89871977159af5d2de2
 
@@ -442,7 +442,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::folder2(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::folder2<hash_t>(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << "Validation Success" << std::endl;
                     else
                         std::cout << "Error Detected" << std::endl;
@@ -451,7 +451,7 @@ int main(int argc, char* argv[])
 
                     std::cout << "Validate Directory Deep: " << " Domain: " << d8u::util::to_hex(domain) << std::endl << std::endl;
 
-                    if (validate::deep_folder2(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
+                    if (validate::deep_folder2<hash_t>(_stats,key, store, domain, 1024 * 1024, 128 * 1024 * 1024, threads, files))
                         std::cout << std::endl << "Validation Success" << std::endl;
                     else
                         std::cout << std::endl << "Error Detected" << std::endl;
@@ -690,7 +690,7 @@ int main(int argc, char* argv[])
                         break;
                     case switch_t("validate"):
                         query = host + ":" + qport;
-                        read = host + ":1" + rport;
+                        read = host + ":" + rport;
                         break;
                     }
 
