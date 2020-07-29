@@ -37,9 +37,9 @@ namespace dircopy
 					throw std::runtime_error("Change Tracking database is locked, is a backup running? Did a backup fail to complete gracefully? If the second is true please delete the folder and try again.");
 			}
 
-			~Path()
-			{
-			}
+			~Path() { }
+
+			std::string Root() { return root; }
 
 			struct FolderStatistics
 			{

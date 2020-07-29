@@ -194,6 +194,9 @@
     <ClInclude Include="..\common\minilzo-2.10\minilzo\minilzo.h">
       <Filter>minilzo</Filter>
     </ClInclude>
+    <ClInclude Include="dircopy\diagnose.hpp">
+      <Filter>dircopy</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

@@ -163,7 +163,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>../scalar_t;../template_hash;..\common\minilzo-2.10;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\blocksync;..\d8u;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>../search;../key_registry;../scalar_t;../template_hash;..\common\minilzo-2.10;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\blocksync;..\d8u;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Debug;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
@@ -183,7 +183,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>../template_hash;..\common\minilzo-2.10;..\blocksync;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;$(IncludePath)</IncludePath>
+    <IncludePath>../scalar_t;../template_hash;..\common\minilzo-2.10;..\blocksync;..\minimalhttp;..\volstore;..\template_db;..\volsnap;..\common\LZMA19.00;..\common\cryptopp8.2;..\d8u;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\Andrew\Documents\GitHub\common\cryptopp8.2\CryptoPP\x64\Output\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='AVX2|x64'">
@@ -444,6 +444,7 @@
     <ClInclude Include="..\common\minilzo-2.10\minilzo\minilzo.h" />
     <ClInclude Include="dircopy\backup.hpp" />
     <ClInclude Include="dircopy\defs.hpp" />
+    <ClInclude Include="dircopy\diagnose.hpp" />
     <ClInclude Include="dircopy\mount.hpp" />
     <ClInclude Include="dircopy\restore.hpp" />
     <ClInclude Include="dircopy\delta.hpp" />
