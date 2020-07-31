@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
     size_t files = 64;
     size_t net_buffer = 16;
     size_t max_memory = 128;
-    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false,index=false;
+    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false,index=false, help = false;
 
     size_t compression = 13;
     size_t block_grouping = 16;
@@ -203,6 +203,7 @@ int main(int argc, char* argv[])
         option("-z", "--server").doc("Host block storage server").set(storage_server),
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-dx", "--index").doc("Index data for fast search").set(index),
+        option("-hp", "--help").doc("Print CLI Documentaion").set(help),
         option("-sq", "--sequence").doc("Validate Blocks that are read or restored").set(sequence),
         option("-dm", "--disable_mapping").doc("used buffered io instead of memory mapping").set(disable_mapping),
         option("-ah", "--aux_hash").doc("Use faster hash for slower hardware").set(aux_hash),
@@ -293,7 +294,7 @@ int main(int argc, char* argv[])
             });
         }
 
-        if (!image.size() && !host.size() && !storage_server )
+        if (help)
             std::cout << make_man_page(cli, argv[0]);
         else
         {
@@ -585,6 +586,10 @@ int main(int argc, char* argv[])
                     simple_command = true;
                     break;
                 case switch_t("diagnose"):
+
+                    running = false;
+
+                    console.join();
 
                     diagnose::self_diagnose();
 
