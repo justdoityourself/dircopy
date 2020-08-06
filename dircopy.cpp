@@ -58,6 +58,9 @@ int main(int argc, char* argv[])
 #include "kreg/client.hpp"
 #include "kreg/local.hpp"
 
+#include "volrng/platform.hpp"
+#include "volrng/volume.hpp"
+
 using std::string;
 using namespace clipp;
 using d8u::switch_t;
@@ -560,6 +563,51 @@ int main(int argc, char* argv[])
 
                 switch (switch_t(action))
                 {
+                case switch_t("rng_validate"):
+                {
+                    std::filesystem::create_directories(snapshot);
+                    volrng::volume::Test<volrng::DISK> handle(snapshot);
+
+                    std::cout << "--rng_validate " << snapshot << " " << path << std::endl;
+                    if (handle.Validate(path))
+                        std::cout << "Point in Time Valid" << std::endl;
+                    else
+                        std::cout << "Point in Time INVALID" << std::endl;
+                }
+                break;
+                case switch_t("rng_step"):
+                {
+                    std::filesystem::create_directories(snapshot);
+                    volrng::volume::Test<volrng::DISK> handle(snapshot);
+
+                    handle.Dismount();
+
+                    std::cout << "--rng_step " << snapshot << " " << path << " " << 100 << "mb" << std::endl;
+                    handle.Run(100 * 1024 * 1024, path);
+                    std::cout << "success" << std::endl;
+                }
+                    break;
+                case switch_t("rng_mount"):
+                {
+                    std::filesystem::create_directories(snapshot);
+                    volrng::volume::Test<volrng::DISK> handle(snapshot);
+
+                    std::cout << "--rng_mount " << snapshot << " " << path << std::endl;
+                    handle.Mount(path);
+                    std::cout << "success" << std::endl;
+                }
+                    break;
+                case switch_t("rng_dismount"):
+                {
+                    std::filesystem::create_directories(snapshot);
+                    volrng::volume::Test<volrng::DISK> handle(snapshot);
+
+                    std::cout << "--rng_dismount " << snapshot << std::endl;
+                    handle.Dismount();
+                    std::cout << "success" << std::endl;
+                }
+                    break;
+
                 case switch_t("list"):
                     if (password.size() && image.size() && snapshot.size())
                     {
