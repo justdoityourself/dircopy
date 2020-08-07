@@ -5,6 +5,9 @@ test/*
 delta/*
 altdelta/*
 teststore/*
+endless_chain/*
+image/*
+snapshot/*
 cli/*
 backup.json
 backup_medium.json

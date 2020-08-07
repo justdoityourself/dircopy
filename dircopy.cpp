@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
     size_t files = 64;
     size_t net_buffer = 16;
     size_t max_memory = 128;
-    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false,index=false, help = false;
+    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false, index = false, help = false, silent = false;
 
     size_t compression = 13;
     size_t block_grouping = 16;
@@ -207,6 +207,7 @@ int main(int argc, char* argv[])
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-dx", "--index").doc("Index data for fast search").set(index),
         option("-hp", "--help").doc("Print CLI Documentaion").set(help),
+        option("-si", "--silent").doc("Print CLI Documentaion").set(silent),
         option("-sq", "--sequence").doc("Validate Blocks that are read or restored").set(sequence),
         option("-dm", "--disable_mapping").doc("used buffered io instead of memory mapping").set(disable_mapping),
         option("-ah", "--aux_hash").doc("Use faster hash for slower hardware").set(aux_hash),
@@ -235,7 +236,7 @@ int main(int argc, char* argv[])
 
     std::thread console([&]()
     {
-        while (running)
+        while (running && !silent)
         {
             pstats->Print();
 
@@ -639,7 +640,7 @@ int main(int argc, char* argv[])
 
                     console.join();
 
-                    diagnose::self_diagnose();
+                    diagnose::self_diagnose(argv[0]);
 
                     simple_command = true;
                     break;

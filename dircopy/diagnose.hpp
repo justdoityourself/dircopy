@@ -5,6 +5,8 @@
 #include <iostream>
 #include <chrono>
 #include <iomanip>
+#include <string_view>
+#include <sstream>
 
 #include "d8u/memory.hpp"
 #include "d8u/util.hpp"
@@ -16,9 +18,12 @@
 
 #include "hash/state.hpp"
 
+#include "volrng/platform.hpp"
+#include "volrng/volume.hpp"
+
 namespace diagnose
 {
-	void self_diagnose()
+	void benchmark()
 	{
 		using namespace std::chrono;
 		using namespace d8u;
@@ -164,5 +169,78 @@ namespace diagnose
 		{
 			transform::lzma_compress2(random_buffer, 9);
 		}) << "MB/s" << e;
+	}
+
+	void workflow(std::string_view bin)
+	{
+		constexpr size_t rounds = 100;
+
+		constexpr std::string_view green("\033[32m"), yellow("\033[33m"), white("\033[0m"), path("endless_chain"), snap("snapshot"), image("image");
+
+
+
+		auto run = [&](auto const& ... args)
+		{
+			std::ostringstream _cmd;
+
+			_cmd << bin << " ";
+
+			((_cmd << args << " "), ...);
+			
+			auto cmd = _cmd.str();
+
+			std::cout << green << "Run: " << cmd << yellow << std::endl << std::endl;
+
+			system(cmd.c_str());
+
+			std::cout << std::endl << std::endl << white;
+		};
+
+		auto reset = [&]()
+		{
+			volrng::DISK::Dismount("endless_chain\\disk.img");
+			std::filesystem::remove_all(path);
+			std::filesystem::remove_all(snap);
+			std::filesystem::remove_all(image);
+		};
+
+
+
+		reset();
+
+		std::thread server([&]()
+		{
+			run("-z --silent -ah --path", image);
+		});
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(3 * 1000));
+
+
+		for (size_t i = 0; i < rounds; i++)
+		{
+			std::cout << white << "Round " << i << " / " << rounds << std::endl << std::endl;
+
+			run("-a rng_step --snapshot", path, "--path Z:");
+
+			run("-a rng_mount --snapshot", path, "--path Z:");
+
+			run("-a backup -ah --compression 21 -h 127.0.0.1 --snapshot", snap, "--path Z:/");
+
+			run("-a rng_dismount --snapshot", path, "--path Z:");
+		}
+
+
+		std::cout << "Finished, shuting down server..." << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(11*1000));
+
+		server.join(); //Todo send shutdown signal
+
+		reset();
+	}
+
+	void self_diagnose(std::string_view bin)
+	{
+		//benchmark();
+		workflow(bin);
 	}
 }
