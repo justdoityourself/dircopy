@@ -71,7 +71,9 @@ using namespace volstore::api;
 
 
         -i cli/image -a backup -p testdata -s cli/snap --compression 21
-        -ac -ah -i cli/image -a backup -p testdata -s cli/snap --compression 21
+        -ac -ah -i cli/image -a backup -p testdata -s cli/snap --compression 21 --security password
+        -ac -ah -i cli/image -a backup -p testdata -s cli/snap --compression 21 --security password
+        -a list --security password -i cli/image -p testdata -s cli/snap
 
         -ah -i cli/image -a validate -k cc7ae0ab563ecbb9a124b427757b5cd75d58a6a768ab15a2c7cdf640d54789e1
 
@@ -177,7 +179,8 @@ int main(int argc, char* argv[])
     size_t files = 64;
     size_t net_buffer = 16;
     size_t max_memory = 128;
-    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false, index = false, help = false, silent = false;
+    bool validate = false, auto_clear_bad_state = false, disable_mapping = true, aux_hash = false, sequence = false, index = false, help = false, silent = false,
+        commit = false, repair = false, assess = false;
 
     size_t compression = 13;
     size_t block_grouping = 16;
@@ -186,7 +189,7 @@ int main(int argc, char* argv[])
     auto cli = (
         option("-c", "--config").doc("Json configuration file") & value("json", json),
         option("-k", "--key").doc("The store key used to restore, mount or validate") & value("key", skey),
-        option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate, compare, sync, migrate, list, diagnose") & value("action", action),
+        option("-a", "--action").doc("What action will be taken, backup, validate_deep, validate, delta, search, restore, fetch, enumerate, compare, sync, migrate, list, diagnose, latest") & value("action", action),
         option("-s", "--snapshot").doc("A path where snapshot databases are stored") & value("snapshot", snapshot),
         option("-i", "--image").doc("Path of the image: D:\\Backup") & value("image", image),
         option("-h", "--host").doc("Hostname or IP of  store: backup.com, 192.168.4.14") & value("host", host),
@@ -207,7 +210,10 @@ int main(int argc, char* argv[])
         option("-x", "--validate").doc("Validate Blocks that are read or restored").set(validate),
         option("-dx", "--index").doc("Index data for fast search").set(index),
         option("-hp", "--help").doc("Print CLI Documentaion").set(help),
-        option("-si", "--silent").doc("Print CLI Documentaion").set(silent),
+        option("-si", "--silent").doc("Disable task status output to console").set(silent),
+        option("-rd", "--repair_database").doc("Full block and database validation and repair. Use --commit to enable repairs to be commited.").set(repair),
+        option("-rdq", "--repair_database_quick").doc("Perform basic database validation, use after crash to rollback incomplete transactions").set(assess),
+        option("-co", "--commit").doc("Allow changes to be make to database during repair process").set(commit),
         option("-sq", "--sequence").doc("Validate Blocks that are read or restored").set(sequence),
         option("-dm", "--disable_mapping").doc("used buffered io instead of memory mapping").set(disable_mapping),
         option("-ah", "--aux_hash").doc("Use faster hash for slower hardware").set(aux_hash),
@@ -610,27 +616,92 @@ int main(int argc, char* argv[])
                     break;
 
                 case switch_t("list"):
+                    silent = true;
                     if (password.size() && image.size() && snapshot.size())
                     {
-                        std::cout << "Listing image metadata..." << std::endl;
+                        if(!silent) std::cout << "Listing image metadata..." << std::endl;
 
-                        kreg::LocalGroup group(snapshot + "\\group", password, image);
+                        kreg::LocalGroup group(snapshot + "\\group", password, image + "\\registry.db");
 
-                        group.EnumerateStream([&](auto & point_in_time) 
+                        std::cout << "{ \n\t\"states\":\n\t[" << std::endl;
+
+                        auto i = 0;
+                        group.EnumerateStream([&](const auto & point_in_time) 
                         {
-                            std::cout << point_in_time << std::endl << std::endl;
+                            if(i) std::cout << ",";
+                            std::cout << "\t\t{" << std::endl;
+
+                            std::cout << "\t\t\"time\": \"" << point_in_time << "\"" << std::endl;
+                            std::cout << "\t\t\"data\": " << group.GetElement(std::string(point_in_time)) << std::endl;
+
+                            std::cout << "\t\t}" << std::endl;
                         });
+
+                        std::cout << "\t]\n}" << std::endl;
                     }
                     else if (password.size() && host.size() && snapshot.size())
                     {
-                        std::cout << "Listing store metadata..." << std::endl;
+                        if (!silent) std::cout << "Listing store metadata..." << std::endl << std::endl;
 
                         kreg::Group group(snapshot + "\\group", password, host + ":7007");
 
-                        group.EnumerateStream([&](auto& point_in_time)
+                        std::cout << "{ \n\t\"states\":\n\t[" << std::endl;
+
+                        auto i = 0;
+                        group.EnumerateStream([&](const auto& point_in_time)
                         {
-                            std::cout << point_in_time << std::endl << std::endl;
+                            if (i) std::cout << ",";
+                            std::cout << "\t\t{" << std::endl;
+
+                            std::cout << "\t\t\"time\": \"" << point_in_time << "\"" << std::endl;
+                            std::cout << "\t\t\"data\": " << group.GetElement(std::string(point_in_time)) << std::endl;
+
+                            std::cout << "\t\t}" << std::endl;
                         });
+
+                        std::cout << "\t]\n}" << std::endl;
+                    }
+                    simple_command = true;
+                    break;
+                case switch_t("latest"):
+                    silent = true;
+                    if (password.size() && image.size() && snapshot.size())
+                    {
+                        if (!silent) std::cout << "Listing image metadata..." << std::endl;
+
+                        kreg::LocalGroup group(snapshot + "\\group", password, image + "\\registry.db");
+
+                        std::string pit;
+                        group.EnumerateStream([&](const auto& point_in_time)
+                        {
+                            pit = point_in_time;
+                        });
+
+                        std::cout << "{" << std::endl;
+
+                        std::cout << "\"time\": \"" << pit << "\"" << std::endl;
+                        std::cout << "\"data\": " << group.GetElement(pit) << std::endl;
+
+                        std::cout << "\}" << std::endl;
+                    }
+                    else if (password.size() && host.size() && snapshot.size())
+                    {
+                        if (!silent) std::cout << "Listing store metadata..." << std::endl << std::endl;
+
+                        kreg::Group group(snapshot + "\\group", password, host + ":7007");
+
+                        std::string pit;
+                        group.EnumerateStream([&](const auto& point_in_time)
+                        {
+                            pit = point_in_time;
+                        });
+
+                        std::cout << "{" << std::endl;
+
+                        std::cout << "\t\"time\": \"" << pit << "\"" << std::endl;
+                        std::cout << "\t\"data\": " << group.GetElement(pit) << std::endl;
+
+                        std::cout << "\}" << std::endl;
                     }
                     simple_command = true;
                     break;
@@ -702,6 +773,14 @@ int main(int argc, char* argv[])
             else
                 simple(tag_t<d8u::transform::_DefaultHash>());
 
+            int image_start_code = 0;
+            if (assess)
+                image_start_code = 1;
+            else if (repair && !commit)
+                image_start_code = 2;
+            else if (repair && commit)
+                image_start_code = 3;
+
             if (storage_server)
             {
                 if (auto_clear_bad_state)
@@ -715,7 +794,7 @@ int main(int argc, char* argv[])
 
                 if (aux_hash)
                 {
-                    StorageService2< fast_hash> service(path, threads, hport, qport, rport, wport);
+                    StorageService2< fast_hash> service(path, image_start_code, threads, hport, qport, rport, wport);
                     pservice1 = &service;
 
                     pstats = service.Stats();
@@ -724,7 +803,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    StorageService2< d8u::transform::_DefaultHash> service(path, threads, hport, qport, rport, wport);
+                    StorageService2< d8u::transform::_DefaultHash> service(path, image_start_code, threads, hport, qport, rport, wport);
                     pservice2 = &service;
 
                     pstats = service.Stats();
@@ -743,26 +822,32 @@ int main(int argc, char* argv[])
                             std::cout << "Image was locked, forcing unlock ( see --auto_clear_bad_state )" << std::endl;
                             std::filesystem::remove(image + "\\lock.db");
                         }
-                    }                
+                    }           
+
+                    using namespace std::chrono;
+                    auto start = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 
                     if (aux_hash)
                     {
-                        volstore::Image2< fast_hash> store(image);
+                        volstore::Image2< fast_hash> store(image, image_start_code);
                         do_switch(store, tag_t<fast_hash>());
                     }
                     else
                     {
-                        volstore::Image2< d8u::transform::_DefaultHash> store(image);
+                        volstore::Image2< d8u::transform::_DefaultHash> store(image, image_start_code);
                         do_switch(store, tag_t<d8u::transform::_DefaultHash>());
                     }
 
+                    auto finished = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+
                     if (pk.size() && password.size() && image.size() && snapshot.size())
                     {
+                        auto kv = [](const auto& k, const auto& v) { return std::make_pair(k, v); };
                         std::cout << "Inserting metadata..." << std::endl;
 
-                        kreg::LocalGroup group(snapshot + "\\group", password,image);
+                        kreg::LocalGroup group(snapshot + "\\group", password,image + "\\registry.db");
 
-                        group.AddElement(pstats->String() + " " + pk + " " + description);
+                        group.AddJsonElement(kv("status",pstats->String()), kv("start", std::to_string(start)), kv("finished", std::to_string(finished)),kv("key", pk), kv("description", description));
                     }
                 }
                 else
@@ -803,18 +888,24 @@ int main(int argc, char* argv[])
                     volstore::BinaryStoreClient2<> store(snapshot + "\\" + host + ".cache", query, read, write, net_buffer * 1024 * 1024);
                     pclient = &store;
                     
+                    using namespace std::chrono;
+                    auto start = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+
                     if (aux_hash)
                         do_switch(store, tag_t<fast_hash>());
                     else
                         do_switch(store, tag_t<d8u::transform::_DefaultHash>());
 
+                    auto finished = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+
                     if (pk.size() && password.size() && host.size() && snapshot.size())
                     {
+                        auto kv = [](const auto& k, const auto& v) { return std::make_pair(k, v); };
                         std::cout << "Inserting metadata..." << std::endl;
 
                         kreg::Group group(snapshot + "\\group", password, host + ":7007");
 
-                        group.AddElement(pstats->String() + " " + pk + " " + description);
+                        group.AddJsonElement(kv("status", pstats->String()), kv("key", pk), kv("start", std::to_string(start)), kv("finished", std::to_string(finished)), kv("description", description));
                     }
                 }
             }
@@ -839,7 +930,7 @@ int main(int argc, char* argv[])
     std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
     uint64_t seconds = elapsed.count();
 
-    std::cout << std::endl << "Finished in: " << (seconds / 60) << "m " << (seconds % 60) << "s" << std::endl;
+    if (!silent) std::cout << std::endl << "Finished in: " << (seconds / 60) << "m " << (seconds % 60) << "s" << std::endl;
 
     return 0;
 }

@@ -15,6 +15,7 @@
 #include "d8u/crypto.hpp"
 #include "d8u/alt_crypto.hpp"
 #include "d8u/transform.hpp"
+#include "d8u/json.hpp"
 
 #include "hash/state.hpp"
 
@@ -175,7 +176,7 @@ namespace diagnose
 	{
 		constexpr size_t rounds = 100;
 
-		constexpr std::string_view green("\033[32m"), yellow("\033[33m"), white("\033[0m"), path("endless_chain"), snap("snapshot"), image("image");
+		constexpr std::string_view green("\033[32m"), yellow("\033[33m"), white("\033[0m"), path("endless_chain"), snap("snapshot"), image("image"), password("password");
 
 
 
@@ -200,8 +201,10 @@ namespace diagnose
 		{
 			volrng::DISK::Dismount("endless_chain\\disk.img");
 			std::filesystem::remove_all(path);
+			std::filesystem::remove_all("restore");
 			std::filesystem::remove_all(snap);
 			std::filesystem::remove_all(image);
+			std::filesystem::remove_all("result.txt");
 		};
 
 
@@ -224,9 +227,17 @@ namespace diagnose
 
 			run("-a rng_mount --snapshot", path, "--path Z:");
 
-			run("-a backup -ah --compression 21 -h 127.0.0.1 --snapshot", snap, "--path Z:/");
+			run("-a backup -ah --compression 21 --description ImageDescriptionText -h 127.0.0.1 --snapshot", snap, "--path Z:/", "--security",password);
+
+			run("-a latest --silent -h 127.0.0.1 --security > result.txt", password, "--snapshot", snap);
+
+			d8u::json::JsonMapS map(std::string_view("result.txt"));
+
+			std::string_view v = map("data")["key"];
 
 			run("-a rng_dismount --snapshot", path, "--path Z:");
+
+			run("-a restore -ah -h 127.0.0.1 -k", v, "--path restore");
 		}
 
 
