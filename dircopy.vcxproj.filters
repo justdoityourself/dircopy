@@ -162,6 +162,9 @@
     <ClCompile Include="..\common\minilzo-2.10\minilzo\minilzo.c">
       <Filter>minilzo</Filter>
     </ClCompile>
+    <ClCompile Include="cli.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dircopy\backup.hpp">
@@ -196,6 +199,9 @@
     </ClInclude>
     <ClInclude Include="dircopy\diagnose.hpp">
       <Filter>dircopy</Filter>
+    </ClInclude>
+    <ClInclude Include="cli.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

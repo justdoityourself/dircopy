@@ -18,3 +18,4 @@ backup_small.json
 restore.json
 result.txt
 restore/*
+chain/*

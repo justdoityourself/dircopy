@@ -23,7 +23,7 @@ namespace dircopy
 
 
 
-		template <typename TH,typename S, typename D> d8u::sse_vector block(Statistics & s,const TH& key, S& store, const D& domain, bool validate = false)
+		template <typename TH,typename S, typename D> d8u::sse_vector block(Statistics & s,TH key, S& store, const D& domain, bool validate = false)
 		{
 			auto file_id = key.GetNext();
 			auto block = store.Read(file_id);

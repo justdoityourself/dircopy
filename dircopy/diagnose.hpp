@@ -22,6 +22,8 @@
 #include "volrng/platform.hpp"
 #include "volrng/volume.hpp"
 
+#include "../cli.h"
+
 namespace diagnose
 {
 	void benchmark()
@@ -176,7 +178,7 @@ namespace diagnose
 	{
 		constexpr size_t rounds = 100;
 
-		constexpr std::string_view green("\033[32m"), yellow("\033[33m"), white("\033[0m"), path("endless_chain"), snap("snapshot"), image("image"), password("password");
+		constexpr std::string_view green("\033[32m"), yellow("\033[33m"), white("\033[0m"), path("chain"), snap("snapshot"), image("image"), password("password");
 
 
 
@@ -199,7 +201,7 @@ namespace diagnose
 
 		auto reset = [&]()
 		{
-			volrng::DISK::Dismount("endless_chain\\disk.img");
+			volrng::DISK::Dismount("chain\\disk.img");
 			std::filesystem::remove_all(path);
 			std::filesystem::remove_all("restore");
 			std::filesystem::remove_all(snap);
@@ -213,7 +215,9 @@ namespace diagnose
 
 		std::thread server([&]()
 		{
-			run("-z --silent -ah --path", image);
+			// run("-z --silent -ah --path", image);
+
+			cli2(bin.data(), "-z","--silent","-ah","--path",image.data());
 		});
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(3 * 1000));
@@ -233,11 +237,14 @@ namespace diagnose
 
 			d8u::json::JsonMapS map(std::string_view("result.txt"));
 
-			std::string_view v = map("data")["key"];
+			std::string v = map("data")["key"];
 
 			run("-a rng_dismount --snapshot", path, "--path Z:");
 
-			run("-a restore -ah -h 127.0.0.1 -k", v, "--path restore");
+			cli2(bin.data(), "-a","validate","-ah","-h","127.0.0.1","-k", v.c_str(),"--files","1");
+			cli2(bin.data(), "-a", "validate_deep", "-ah", "-h", "127.0.0.1", "-k", v.c_str(), "--files", "1");
+
+			cli2(bin.data(), "-a", "restore", "-ah", "-h", "127.0.0.1", "-k", v.c_str(), "--path", "restore", "--files", "1", "--threads", "1");
 		}
 
 
